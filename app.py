@@ -118,7 +118,7 @@ def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Contar quantas vezes cada código foi bipado
+    # Dados bipados
     cur.execute("""
         SELECT codigo_qr, COUNT(*) AS bipado
         FROM registros_qr
@@ -127,12 +127,14 @@ def relatorio_diferencas():
     bipados = cur.fetchall()
     bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Agrupar a lista de carga por código, somando TOTAL e CARGAS
+    # Agrupar lista de carga por cod_insumo com CAST nas somas
     cur.execute("""
-        SELECT cod_insumo, produto, obra, SUM(cargas), SUM(total), pav
+        SELECT cod_insumo, produto, obra, 
+               SUM(CAST(cargas AS INTEGER)) AS cargas, 
+               SUM(CAST(total AS INTEGER)) AS total, 
+               pav
         FROM lista_de_carga
         GROUP BY cod_insumo, produto, obra, pav
-        ORDER BY obra
     """)
     lista = cur.fetchall()
 
@@ -141,7 +143,6 @@ def relatorio_diferencas():
         cod_insumo, produto, obra, cargas, total, pav = item
         bipado = bipados_dict.get(cod_insumo, 0)
         faltando = total - bipado
-
         relatorio.append({
             "cod_insumo": cod_insumo,
             "produto": produto,
@@ -149,13 +150,14 @@ def relatorio_diferencas():
             "cargas": cargas,
             "total_necessario": total,
             "bipado": bipado,
-            "faltando": max(faltando, 0)
+            "faltando": faltando
         })
 
     cur.close()
     conn.close()
 
     return jsonify(relatorio)
+
 
 
 if __name__ == '__main__':
