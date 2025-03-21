@@ -31,6 +31,11 @@ def importar_lista():
 def lista_carga():
     return send_file('lista_carga.html')
 
+# Página do relatório
+@app.route('/relatorio')
+def relatorio():
+    return send_file('relatorio.html')
+
 # Rota para registrar um QR Code no banco
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
@@ -123,6 +128,49 @@ def listar_carga():
     registros_formatados = [dict(zip(colunas, linha)) for linha in dados]
 
     return jsonify(registros_formatados)
+
+# Rota para gerar o relatório de comparação entre bipagem e lista de carga
+@app.route('/relatorio_diferencas', methods=['GET'])
+def relatorio_diferencas():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Contar quantas vezes cada código foi bipado
+    cur.execute("""
+        SELECT codigo_qr, COUNT(*) AS bipado
+        FROM registros_qr
+        GROUP BY codigo_qr
+    """)
+    bipados = cur.fetchall()
+    bipados_dict = {codigo: qtd for codigo, qtd in bipados}
+
+    # Trazer todos os itens da lista de carga
+    cur.execute("""
+        SELECT cod_insumo, produto, obra, cargas, total, pav
+        FROM lista_de_carga
+    """)
+    lista = cur.fetchall()
+
+    relatorio = []
+    for item in lista:
+        cod_insumo, produto, obra, cargas, total, pav = item
+        bipado = bipados_dict.get(cod_insumo, 0)
+        diferenca = int(total) - bipado
+
+        relatorio.append({
+            "cod_insumo": cod_insumo,
+            "produto": produto,
+            "obra": obra,
+            "cargas": cargas,
+            "total_necessario": total,
+            "bipado": bipado,
+            "faltando": diferenca
+        })
+
+    cur.close()
+    conn.close()
+
+    return jsonify(relatorio)
 
 if __name__ == '__main__':
     app.run(debug=True)
