@@ -70,7 +70,11 @@
   </div>
 
   <div id="resumo">
-    <p>Total Atendidos: <span id="resumoVerde">0</span> | Parciais: <span id="resumoAmarelo">0</span> | Não Atendidos: <span id="resumoVermelho">0</span></p>
+    <p>
+      Total de Itens: <span id="resumoTotal">0</span> |
+      Atendidos: <span id="resumoVerde">0</span> |
+      Não Atendidos: <span id="resumoVermelho">0</span>
+    </p>
   </div>
 
   <table>
@@ -138,7 +142,7 @@
       const tabela = document.getElementById('tabelaRelatorio');
       tabela.innerHTML = '';
 
-      let atendido = 0, parcial = 0, naoAtendido = 0;
+      let atendido = 0, naoAtendido = 0;
 
       const filtrado = data.filter(item => {
         let status;
@@ -168,7 +172,6 @@
           atendido++;
         } else {
           classe = 'status-amarelo';
-          parcial++;
         }
 
         const row = document.createElement('tr');
@@ -185,8 +188,8 @@
         tabela.appendChild(row);
       });
 
+      document.getElementById('resumoTotal').textContent = filtrado.length;
       document.getElementById('resumoVerde').textContent = atendido;
-      document.getElementById('resumoAmarelo').textContent = parcial;
       document.getElementById('resumoVermelho').textContent = naoAtendido;
     }
 
