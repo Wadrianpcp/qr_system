@@ -127,13 +127,14 @@ def relatorio_diferencas():
     bipados = cur.fetchall()
     bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Agrupar lista de carga por cod_insumo com CAST nas somas
+    # Agrupar lista de carga por cod_insumo SOMENTE onde há números válidos
     cur.execute("""
-        SELECT cod_insumo, produto, obra, 
-               SUM(CAST(cargas AS INTEGER)) AS cargas, 
-               SUM(CAST(total AS INTEGER)) AS total, 
+        SELECT cod_insumo, produto, obra,
+               SUM(CAST(cargas AS INTEGER)) AS cargas,
+               SUM(CAST(total AS INTEGER)) AS total,
                pav
         FROM lista_de_carga
+        WHERE cargas ~ '^[0-9]+$' AND total ~ '^[0-9]+$'
         GROUP BY cod_insumo, produto, obra, pav
     """)
     lista = cur.fetchall()
@@ -155,6 +156,7 @@ def relatorio_diferencas():
 
     cur.close()
     conn.close()
+
 
     return jsonify(relatorio)
 
