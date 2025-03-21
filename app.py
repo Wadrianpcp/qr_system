@@ -29,7 +29,7 @@ def lista_carga():
 def relatorio():
     return send_file('relatorio.html')
 
-# Registrar QR Code
+# REGISTRAR QR
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
     data = request.json
@@ -41,13 +41,7 @@ def registrar_qr():
 
     conn = get_db_connection()
     cur = conn.cursor()
-
     try:
-        # Verifica se já foi bipado
-        cur.execute("SELECT COUNT(*) FROM registros_qr WHERE codigo_qr = %s", (codigo_qr,))
-        if cur.fetchone()[0] > 0:
-            return jsonify({"erro": "QR Code já bipado!"}), 409
-
         cur.execute("INSERT INTO registros_qr (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
         conn.commit()
         return jsonify({"mensagem": "QR Code registrado com sucesso!"}), 201
@@ -57,7 +51,7 @@ def registrar_qr():
         cur.close()
         conn.close()
 
-# Listar registros
+# LISTAR REGISTROS
 @app.route('/listar_qr', methods=['GET'])
 def listar_qr():
     conn = get_db_connection()
@@ -68,35 +62,31 @@ def listar_qr():
     conn.close()
 
     registros_formatados = [
-        {"id": r[0], "codigo_qr": r[1], "data_hora": r[2], "usuario": r[3], "status": r[4]} for r in registros
+        {"id": r[0], "codigo_qr": r[1], "data_hora": r[2].strftime("%Y-%m-%d %H:%M:%S"), "usuario": r[3], "status": r[4]}
+        for r in registros
     ]
     return jsonify(registros_formatados)
 
-# Apagar um QR Code (com senha)
-@app.route('/apagar_qr', methods=['POST'])
-def apagar_qr():
-    data = request.json
-    codigo_qr = data.get('codigo_qr')
-    senha = data.get('senha')
-
+# EXCLUIR REGISTRO COM SENHA
+@app.route('/excluir_qr/<int:id>', methods=['DELETE'])
+def excluir_qr(id):
+    senha = request.args.get('senha')
     if senha != "@pcp1234":
-        return jsonify({"erro": "Senha incorreta!"}), 403
+        return jsonify({"erro": "Senha incorreta"}), 403
 
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("DELETE FROM registros_qr WHERE codigo_qr = %s", (codigo_qr,))
-        if cur.rowcount == 0:
-            return jsonify({"erro": "Registro não encontrado."}), 404
+        cur.execute("DELETE FROM registros_qr WHERE id = %s", (id,))
         conn.commit()
-        return jsonify({"mensagem": f"QR Code {codigo_qr} removido com sucesso!"})
+        return jsonify({"sucesso": True}), 200
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
         conn.close()
 
-# Upload da lista de carga
+# UPLOAD LISTA DE CARGA
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
     if 'arquivo' not in request.files:
@@ -127,11 +117,13 @@ def upload_lista_carga():
         conn.commit()
         cur.close()
         conn.close()
+
         return jsonify({'mensagem': 'Lista de carga importada com sucesso.'}), 200
+
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
-# Listar lista de carga
+# LISTAR LISTA DE CARGA
 @app.route('/listar_carga', methods=['GET'])
 def listar_carga():
     conn = get_db_connection()
@@ -141,10 +133,11 @@ def listar_carga():
     colunas = [desc[0] for desc in cur.description]
     cur.close()
     conn.close()
+
     registros_formatados = [dict(zip(colunas, linha)) for linha in dados]
     return jsonify(registros_formatados)
 
-# Relatório comparativo bipagem x carga
+# RELATÓRIO DIFERENÇAS
 @app.route('/relatorio_diferencas', methods=['GET'])
 def relatorio_diferencas():
     conn = get_db_connection()
@@ -164,8 +157,8 @@ def relatorio_diferencas():
         ORDER BY obra, cod_insumo
     """)
     lista = cur.fetchall()
-
     relatorio = []
+
     for linha in lista:
         cod_insumo, produto, uhs, obra, cargas, total, pav = linha
         total = int(total)
