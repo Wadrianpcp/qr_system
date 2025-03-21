@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Lista de Carga</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    #btn-voltar {
+      margin-top: 20px;
+      padding: 10px 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Lista de Carga</h1>
+  <table>
+    <thead>
+      <tr id="cabecalhoTabela"></tr>
+    </thead>
+    <tbody id="corpoTabela">
+      <tr><td colspan="10">Carregando dados...</td></tr>
+    </tbody>
+  </table>
+  <button id="btn-voltar" onclick="window.location.href='/'">Voltar</button>
+
+  <script>
+    fetch('/listar_carga')
+      .then(res => res.json())
+      .then(data => {
+        const cabecalho = document.getElementById('cabecalhoTabela');
+        const corpo = document.getElementById('corpoTabela');
+
+        corpo.innerHTML = '';
+
+        if (data.length === 0) {
+          corpo.innerHTML = '<tr><td colspan="10">Nenhum dado encontrado</td></tr>';
+          return;
+        }
+
+        // Criar cabeçalho dinâmico
+        Object.keys(data[0]).forEach(col => {
+          cabecalho.innerHTML += `<th>${col}</th>`;
+        });
+
+        // Criar linhas da tabela
+        data.forEach(row => {
+          let linha = '<tr>';
+          for (let col in row) {
+            linha += `<td>${row[col]}</td>`;
+          }
+          linha += '</tr>';
+          corpo.innerHTML += linha;
+        });
+      })
+      .catch(() => {
+        document.getElementById('corpoTabela').innerHTML = '<tr><td colspan="10">Erro ao carregar dados.</td></tr>';
+      });
+  </script>
+</body>
+</html>
