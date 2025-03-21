@@ -44,13 +44,17 @@
 
   <div id="filtros">
     <label for="filtroObra">Filtrar por Obra:</label>
-    <select id="filtroObra">
-      <option value="">Todas</option>
-    </select>
+    <select id="filtroObra"><option value="">Todas</option></select>
 
     <label for="filtroProduto">Filtrar por Produto:</label>
-    <select id="filtroProduto">
+    <select id="filtroProduto"><option value="">Todos</option></select>
+
+    <label for="filtroStatus">Status:</label>
+    <select id="filtroStatus">
       <option value="">Todos</option>
+      <option value="atendido">Atendido</option>
+      <option value="parcial">Parcial</option>
+      <option value="nao_atendido">Não Atendido</option>
     </select>
   </div>
 
@@ -79,12 +83,17 @@
     function aplicarFiltros() {
       const obra = document.getElementById("filtroObra").value;
       const produto = document.getElementById("filtroProduto").value;
+      const status = document.getElementById("filtroStatus").value;
 
       const tabela = document.getElementById('tabelaRelatorio');
       tabela.innerHTML = '';
 
       const dadosFiltrados = dadosOriginais.filter(item => {
-        return (!obra || item.obra === obra) && (!produto || item.produto === produto);
+        let statusItem = item.faltando === 0 ? "atendido" :
+                         item.bipado > 0 ? "parcial" : "nao_atendido";
+        return (!obra || item.obra === obra) &&
+               (!produto || item.produto === produto) &&
+               (!status || statusItem === status);
       });
 
       if (dadosFiltrados.length === 0) {
@@ -148,6 +157,7 @@
 
     document.getElementById("filtroObra").addEventListener("change", aplicarFiltros);
     document.getElementById("filtroProduto").addEventListener("change", aplicarFiltros);
+    document.getElementById("filtroStatus").addEventListener("change", aplicarFiltros);
   </script>
 </body>
 </html>
