@@ -2,12 +2,23 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
-  <title>Relatório de Carga x Bipagem</title>
+  <title>Relatório de Atendimento da Carga</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
       text-align: center;
+    }
+    #filtros {
+      margin-bottom: 20px;
+    }
+    select {
+      padding: 5px;
+      margin: 0 10px;
+    }
+    #resumo {
+      margin-bottom: 20px;
+      font-weight: bold;
     }
     table {
       width: 100%;
@@ -22,15 +33,14 @@
     th {
       background-color: #f0f0f0;
     }
-    .verde { background-color: #d4edda; }
-    .amarelo { background-color: #fff3cd; }
-    .vermelho { background-color: #f8d7da; }
-    #filtros {
-      margin-bottom: 20px;
+    .status-verde {
+      background-color: #d4edda;
     }
-    select {
-      padding: 8px;
-      margin: 0 10px;
+    .status-amarelo {
+      background-color: #fff3cd;
+    }
+    .status-vermelho {
+      background-color: #f8d7da;
     }
     #btn-voltar {
       margin-top: 20px;
@@ -43,19 +53,24 @@
   <h1>Relatório de Atendimento da Carga</h1>
 
   <div id="filtros">
-    <label for="filtroObra">Filtrar por Obra:</label>
-    <select id="filtroObra"><option value="">Todas</option></select>
+    <label>Obra:
+      <select id="filtroObra"><option value="">Todas</option></select>
+    </label>
+    <label>Produto:
+      <select id="filtroProduto"><option value="">Todos</option></select>
+    </label>
+    <label>Status:
+      <select id="filtroStatus">
+        <option value="">Todos</option>
+        <option value="verde">Atendido</option>
+        <option value="amarelo">Parcial</option>
+        <option value="vermelho">Não Atendido</option>
+      </select>
+    </label>
+  </div>
 
-    <label for="filtroProduto">Filtrar por Produto:</label>
-    <select id="filtroProduto"><option value="">Todos</option></select>
-
-    <label for="filtroStatus">Status:</label>
-    <select id="filtroStatus">
-      <option value="">Todos</option>
-      <option value="atendido">Atendido</option>
-      <option value="parcial">Parcial</option>
-      <option value="nao_atendido">Não Atendido</option>
-    </select>
+  <div id="resumo">
+    <p>Total Atendidos: <span id="resumoVerde">0</span> | Parciais: <span id="resumoAmarelo">0</span> | Não Atendidos: <span id="resumoVermelho">0</span></p>
   </div>
 
   <table>
@@ -78,38 +93,85 @@
   <button id="btn-voltar" onclick="window.location.href='/'">Voltar</button>
 
   <script>
-    let dadosOriginais = [];
+    let dadosGlobais = [];
 
-    function aplicarFiltros() {
-      const obra = document.getElementById("filtroObra").value;
-      const produto = document.getElementById("filtroProduto").value;
-      const status = document.getElementById("filtroStatus").value;
+    function carregarRelatorio() {
+      fetch('/relatorio_diferencas')
+        .then(res => res.json())
+        .then(data => {
+          dadosGlobais = data;
+          preencherFiltros(data);
+          renderizarTabela(data);
+        })
+        .catch(() => {
+          document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Erro ao carregar dados.</td></tr>';
+        });
+    }
+
+    function preencherFiltros(data) {
+      const obras = [...new Set(data.map(d => d.obra))];
+      const produtos = [...new Set(data.map(d => d.produto))];
+
+      const obraSelect = document.getElementById('filtroObra');
+      const produtoSelect = document.getElementById('filtroProduto');
+
+      obras.forEach(obra => {
+        const opt = document.createElement('option');
+        opt.value = obra;
+        opt.textContent = obra;
+        obraSelect.appendChild(opt);
+      });
+
+      produtos.forEach(prod => {
+        const opt = document.createElement('option');
+        opt.value = prod;
+        opt.textContent = prod;
+        produtoSelect.appendChild(opt);
+      });
+    }
+
+    function renderizarTabela(data) {
+      const filtroObra = document.getElementById('filtroObra').value;
+      const filtroProduto = document.getElementById('filtroProduto').value;
+      const filtroStatus = document.getElementById('filtroStatus').value;
 
       const tabela = document.getElementById('tabelaRelatorio');
       tabela.innerHTML = '';
 
-      const dadosFiltrados = dadosOriginais.filter(item => {
-        let statusItem = item.faltando === 0 ? "atendido" :
-                         item.bipado > 0 ? "parcial" : "nao_atendido";
-        return (!obra || item.obra === obra) &&
-               (!produto || item.produto === produto) &&
-               (!status || statusItem === status);
+      let atendido = 0, parcial = 0, naoAtendido = 0;
+
+      const filtrado = data.filter(item => {
+        let status;
+        if (item.bipado == 0) status = 'vermelho';
+        else if (item.faltando == 0) status = 'verde';
+        else status = 'amarelo';
+
+        const condObra = !filtroObra || item.obra === filtroObra;
+        const condProd = !filtroProduto || item.produto === filtroProduto;
+        const condStatus = !filtroStatus || status === filtroStatus;
+
+        return condObra && condProd && condStatus;
       });
 
-      if (dadosFiltrados.length === 0) {
-        tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado com os filtros selecionados.</td></tr>';
+      if (filtrado.length === 0) {
+        tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
         return;
       }
 
-      dadosFiltrados.forEach(item => {
-        const row = document.createElement('tr');
-        let classe = 'vermelho';
-        if (item.faltando === 0) {
-          classe = 'verde';
-        } else if (item.bipado > 0 && item.faltando > 0) {
-          classe = 'amarelo';
+      filtrado.forEach(item => {
+        let classe = '';
+        if (item.bipado == 0) {
+          classe = 'status-vermelho';
+          naoAtendido++;
+        } else if (item.faltando == 0) {
+          classe = 'status-verde';
+          atendido++;
+        } else {
+          classe = 'status-amarelo';
+          parcial++;
         }
 
+        const row = document.createElement('tr');
         row.className = classe;
         row.innerHTML = `
           <td>${item.cod_insumo}</td>
@@ -122,42 +184,17 @@
         `;
         tabela.appendChild(row);
       });
+
+      document.getElementById('resumoVerde').textContent = atendido;
+      document.getElementById('resumoAmarelo').textContent = parcial;
+      document.getElementById('resumoVermelho').textContent = naoAtendido;
     }
 
-    fetch('/relatorio_diferencas')
-      .then(res => res.json())
-      .then(data => {
-        dadosOriginais = data;
-        const tabela = document.getElementById('tabelaRelatorio');
-        const filtroObra = document.getElementById("filtroObra");
-        const filtroProduto = document.getElementById("filtroProduto");
+    document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
+    document.getElementById('filtroProduto').addEventListener('change', () => renderizarTabela(dadosGlobais));
+    document.getElementById('filtroStatus').addEventListener('change', () => renderizarTabela(dadosGlobais));
 
-        const obras = [...new Set(data.map(i => i.obra))];
-        const produtos = [...new Set(data.map(i => i.produto))];
-
-        obras.forEach(obra => {
-          const opt = document.createElement("option");
-          opt.value = obra;
-          opt.textContent = obra;
-          filtroObra.appendChild(opt);
-        });
-
-        produtos.forEach(prod => {
-          const opt = document.createElement("option");
-          opt.value = prod;
-          opt.textContent = prod;
-          filtroProduto.appendChild(opt);
-        });
-
-        aplicarFiltros();
-      })
-      .catch(() => {
-        document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Erro ao carregar dados.</td></tr>';
-      });
-
-    document.getElementById("filtroObra").addEventListener("change", aplicarFiltros);
-    document.getElementById("filtroProduto").addEventListener("change", aplicarFiltros);
-    document.getElementById("filtroStatus").addEventListener("change", aplicarFiltros);
+    carregarRelatorio();
   </script>
 </body>
 </html>
