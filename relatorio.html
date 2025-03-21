@@ -10,11 +10,11 @@
       margin: 20px;
       text-align: center;
     }
-    #filtros {
+    #filtros, #usuarioContainer {
       margin-bottom: 20px;
     }
-    select {
-      padding: 5px;
+    select, input[type="text"] {
+      padding: 6px;
       margin: 0 10px;
     }
     #resumo {
@@ -57,6 +57,12 @@
 </head>
 <body>
   <h1>Relatório de Atendimento da Carga</h1>
+
+  <div id="usuarioContainer">
+    <label>Usuário:
+      <input type="text" id="nomeUsuario" placeholder="Digite seu nome para exportar">
+    </label>
+  </div>
 
   <div id="filtros">
     <label>Obra:
@@ -206,12 +212,28 @@
     }
 
     function exportarExcel() {
+      const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
+      const agora = new Date().toLocaleString();
+      const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
+
       const tabela = document.querySelector("table");
       const wb = XLSX.utils.table_to_book(tabela, { sheet: "Relatório" });
+
+      // Adiciona rodapé no final da planilha
+      const ws = wb.Sheets["Relatório"];
+      const ultimaLinha = XLSX.utils.decode_range(ws['!ref']).e.r + 2;
+      const cellAddress = `A${ultimaLinha}`;
+      ws[cellAddress] = { t: 's', v: rodape };
+      ws['!ref'] = ws['!ref'].replace(/:\w+\d+$/, `:A${ultimaLinha}`);
+
       XLSX.writeFile(wb, "relatorio_carga.xlsx");
     }
 
     function exportarPDF() {
+      const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
+      const agora = new Date().toLocaleString();
+      const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
+
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
 
@@ -228,9 +250,11 @@
       doc.autoTable({
         head: headers,
         body: body,
-        startY: 25
+        startY: 25,
+        margin: { bottom: 20 }
       });
 
+      doc.text(rodape, 14, doc.internal.pageSize.height - 10);
       doc.save("relatorio_carga.pdf");
     }
 
@@ -242,4 +266,3 @@
   </script>
 </body>
 </html>
-
