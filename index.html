@@ -4,16 +4,47 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro de QR Code</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
             text-align: center;
-            margin: 50px;
+            width: 90%;
+            max-width: 400px;
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
         }
         input, button {
-            padding: 10px;
-            margin: 10px;
+            padding: 12px;
+            margin: 10px 0;
+            width: 100%;
             font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        button {
+            background-color: #6366f1;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #4f46e5;
         }
         #mensagem {
             margin-top: 20px;
@@ -23,16 +54,16 @@
     </style>
 </head>
 <body>
-    <h1>Registro de QR Code</h1>
+    <div class="container">
+        <h1>Registro de QR Code</h1>
 
-    <label for="usuario">Nome do Usuário:</label>
-    <input type="text" id="usuario" placeholder="Digite seu nome">
+        <input type="text" id="usuario" placeholder="Digite seu nome">
 
-    <br>
-    <button onclick="abrirCaixaDeDialogo()">Bipar QR Code</button>
-    <button onclick="irParaRegistros()">Ver Registros</button>
+        <button onclick="abrirCaixaDeDialogo()">Bipar QR Code</button>
+        <button onclick="irParaRegistros()">Ver Registros</button>
 
-    <p id="mensagem"></p>
+        <p id="mensagem"></p>
+    </div>
 
     <script>
         function abrirCaixaDeDialogo() {
@@ -46,7 +77,6 @@
                     return;
                 }
 
-                // Enviar o QR Code para o servidor Flask
                 fetch('/registrar_qr', {
                     method: 'POST',
                     headers: {
@@ -59,12 +89,9 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById("mensagem").innerText = data.mensagem || data.erro;
+                    document.getElementById("mensagem").innerText = data.mensagem;
                 })
-                .catch(error => {
-                    console.error("Erro:", error);
-                    document.getElementById("mensagem").innerText = "Erro ao registrar QR Code.";
-                });
+                .catch(error => console.error("Erro:", error));
             }
         }
 
