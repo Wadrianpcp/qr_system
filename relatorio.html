@@ -22,12 +22,18 @@
     th {
       background-color: #f0f0f0;
     }
+
+    /* CORES DE STATUS */
     .faltando-zero {
-      background-color: #d4edda;
+      background-color: #d4edda; /* Verde - Atendido */
     }
-    .faltando-positivo {
-      background-color: #f8d7da;
+    .faltando-parcial {
+      background-color: #fff3cd; /* Amarelo - Parcialmente Atendido */
     }
+    .faltando-total {
+      background-color: #f8d7da; /* Vermelho - Nada Bipado */
+    }
+
     #btn-voltar {
       margin-top: 20px;
       padding: 10px 20px;
@@ -82,7 +88,15 @@
             <td>${item.faltando}</td>
           `;
 
-          row.className = item.faltando === 0 ? 'faltando-zero' : 'faltando-positivo';
+          // Lógica para definir a cor da linha
+          if (item.faltando === 0) {
+            row.className = 'faltando-zero'; // Verde
+          } else if (item.bipado > 0) {
+            row.className = 'faltando-parcial'; // Amarelo
+          } else {
+            row.className = 'faltando-total'; // Vermelho
+          }
+
           tabela.appendChild(row);
         });
       })
