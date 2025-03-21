@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de QR Code</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 10px;
+            font-size: 16px;
+        }
+        #mensagem {
+            margin-top: 20px;
+            font-weight: bold;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Registro de QR Code</h1>
+
+    <label for="usuario">Nome do Usuário:</label>
+    <input type="text" id="usuario" placeholder="Digite seu nome">
+
+    <br>
+    <button onclick="abrirCaixaDeDialogo()">Bipar QR Code</button>
+    <button onclick="irParaRegistros()">Ver Registros</button>
+
+    <p id="mensagem"></p>
+
+    <script>
+        function abrirCaixaDeDialogo() {
+            let codigo_qr = prompt("Escaneie o QR Code ou digite o código:");
+
+            if (codigo_qr) {
+                let usuario = document.getElementById("usuario").value;
+
+                if (!usuario) {
+                    alert("Por favor, digite seu nome antes de bipar!");
+                    return;
+                }
+
+                // Enviar o QR Code para o servidor Flask
+                fetch('http://127.0.0.1:5000/registrar_qr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        codigo_qr: codigo_qr,
+                        usuario: usuario
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("mensagem").innerText = data.mensagem;
+                })
+                .catch(error => console.error("Erro:", error));
+            }
+        }
+
+        function irParaRegistros() {
+            window.location.href = "/registros";
+        }
+    </script>
+</body>
+</html>

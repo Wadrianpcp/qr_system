@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registros de QR Codes</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Registros de QR Codes</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Código QR</th>
+                <th>Data/Hora</th>
+                <th>Usuário</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="tabelaRegistros">
+            <tr><td colspan="5">Carregando...</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        function carregarRegistros() {
+            fetch('/listar_qr')
+                .then(response => response.json())
+                .then(data => {
+                    let tabela = document.getElementById('tabelaRegistros');
+                    tabela.innerHTML = ""; // Limpa a tabela
+
+                    if (data.length === 0) {
+                        tabela.innerHTML = "<tr><td colspan='5'>Nenhum registro encontrado.</td></tr>";
+                        return;
+                    }
+
+                    data.forEach(registro => {
+                        let row = `<tr>
+                            <td>${registro.id}</td>
+                            <td>${registro.codigo_qr}</td>
+                            <td>${registro.data_hora}</td>
+                            <td>${registro.usuario}</td>
+                            <td>${registro.status}</td>
+                        </tr>`;
+                        tabela.innerHTML += row;
+                    });
+                })
+                .catch(error => {
+                    console.error("Erro ao carregar registros:", error);
+                    document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='5'>Erro ao carregar dados.</td></tr>";
+                });
+        }
+
+        // Carregar os registros ao abrir a página
+        window.onload = carregarRegistros;
+    </script>
+</body>
+</html>
