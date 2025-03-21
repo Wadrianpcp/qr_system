@@ -6,57 +6,70 @@
   <title>Registro de QR Code</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: 'Roboto', sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f7f9fc;
+      background-color: #f9f9f9;
     }
 
     .top-bar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      padding: 15px;
-      background-color: #ffffff;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       justify-content: space-between;
-      gap: 10px;
+      padding: 15px 20px;
+      background-color: #007bff;
+      color: white;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
     }
 
-    .top-bar input, .top-bar button, .slider-container label {
-      font-size: 16px;
+    .top-bar input, .top-bar button, .top-bar .slider-container {
+      margin: 8px 5px;
     }
 
     #usuario, #qrInput {
       padding: 10px;
-      width: 200px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+    }
+
+    #qrInput {
+      width: 250px;
+    }
+
+    .slider-container label {
+      font-size: 14px;
+      margin-right: 5px;
+    }
+
+    .slider-container input {
+      vertical-align: middle;
     }
 
     button {
-      padding: 10px 16px;
-      background-color: #0066cc;
-      color: white;
+      background-color: white;
+      color: #007bff;
       border: none;
-      border-radius: 5px;
+      padding: 10px 15px;
+      border-radius: 4px;
+      font-weight: bold;
       cursor: pointer;
-      transition: background 0.2s ease;
+      transition: 0.3s;
     }
 
     button:hover {
-      background-color: #004c99;
-    }
-
-    .slider-container {
-      display: flex;
-      align-items: center;
-      gap: 5px;
+      background-color: #e9ecef;
     }
 
     #mensagem {
-      margin: 10px;
+      text-align: center;
+      margin-top: 15px;
       font-weight: bold;
       color: green;
     }
@@ -75,6 +88,21 @@
       justify-content: center;
       display: none;
       z-index: 999;
+    }
+
+    @media (max-width: 768px) {
+      .top-bar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      #qrInput {
+        width: 100%;
+      }
+
+      .slider-container {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -124,7 +152,8 @@
         .then(data => {
           document.getElementById("mensagem").innerText = data.mensagem || "Erro ao registrar.";
         })
-        .catch(() => {
+        .catch(err => {
+          console.error("Erro:", err);
           document.getElementById("mensagem").innerText = "Erro ao registrar.";
         });
 
