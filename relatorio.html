@@ -3,106 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <title>Relatório de Atendimento da Carga</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: 'Inter', sans-serif;
-      margin: 0;
-      padding: 0;
-      background: #f9f9f9;
-      color: #333;
-    }
-
-    h1 {
-      margin: 20px 0;
-    }
-
-    #filtros {
-      background-color: #ffffff;
-      padding: 15px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 15px;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-
-    select {
-      padding: 8px 12px;
-      font-size: 15px;
-    }
-
-    #resumo {
-      margin: 15px;
-      font-weight: 600;
-    }
-
-    table {
-      width: 95%;
-      margin: 0 auto 30px;
-      border-collapse: collapse;
-      background: white;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    th, td {
-      padding: 10px 8px;
-      border-bottom: 1px solid #ddd;
+      font-family: 'Roboto', sans-serif;
+      margin: 20px;
       text-align: center;
     }
-
-    th {
-      background-color: #f2f2f2;
-      position: sticky;
-      top: 75px;
-      z-index: 5;
+    #filtros {
+      margin-bottom: 20px;
     }
-
+    select {
+      padding: 5px;
+      margin: 0 10px;
+    }
+    #resumo {
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
     .status-verde {
       background-color: #d4edda;
     }
-
     .status-amarelo {
       background-color: #fff3cd;
     }
-
     .status-vermelho {
       background-color: #f8d7da;
     }
-
-    #btn-voltar {
-      margin: 20px;
-      padding: 10px 25px;
-      font-size: 16px;
-      border: none;
-      background-color: #2c7be5;
-      color: white;
-      border-radius: 4px;
+    .btn-container {
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
       cursor: pointer;
-      transition: 0.3s ease;
-    }
-
-    #btn-voltar:hover {
-      background-color: #1a5bb8;
-    }
-
-    @media (max-width: 768px) {
-      #filtros {
-        flex-direction: column;
-        align-items: center;
-      }
-
-      table, th, td {
-        font-size: 14px;
-      }
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
-
   <h1>Relatório de Atendimento da Carga</h1>
 
   <div id="filtros">
@@ -123,10 +76,13 @@
   </div>
 
   <div id="resumo">
-    <p>Total de Itens: <span id="resumoTotal">0</span> |
-       Atendidos: <span id="resumoVerde">0</span> |
-       Não Atendidos: <span id="resumoVermelho">0</span>
-    </p>
+    <p>Total Atendidos: <span id="resumoVerde">0</span> | Não Atendidos: <span id="resumoVermelho">0</span> | Total de Itens: <span id="resumoTotal">0</span></p>
+  </div>
+
+  <div class="btn-container">
+    <button onclick="exportarExcel()">Exportar para Excel</button>
+    <button onclick="exportarPDF()">Exportar para PDF</button>
+    <button onclick="window.location.href='/'">Voltar</button>
   </div>
 
   <table>
@@ -146,7 +102,10 @@
     </tbody>
   </table>
 
-  <button id="btn-voltar" onclick="window.location.href='/'">Voltar</button>
+  <!-- Bibliotecas para exportação -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
   <script>
     let dadosGlobais = [];
@@ -195,7 +154,6 @@
       tabela.innerHTML = '';
 
       let atendido = 0, parcial = 0, naoAtendido = 0;
-      let totalItens = 0;
 
       const filtrado = data.filter(item => {
         let status;
@@ -228,8 +186,6 @@
           parcial++;
         }
 
-        totalItens++;
-
         const row = document.createElement('tr');
         row.className = classe;
         row.innerHTML = `
@@ -246,7 +202,36 @@
 
       document.getElementById('resumoVerde').textContent = atendido;
       document.getElementById('resumoVermelho').textContent = naoAtendido;
-      document.getElementById('resumoTotal').textContent = totalItens;
+      document.getElementById('resumoTotal').textContent = filtrado.length;
+    }
+
+    function exportarExcel() {
+      const tabela = document.querySelector("table");
+      const wb = XLSX.utils.table_to_book(tabela, { sheet: "Relatório" });
+      XLSX.writeFile(wb, "relatorio_carga.xlsx");
+    }
+
+    function exportarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      doc.text("Relatório de Atendimento da Carga", 14, 15);
+
+      const headers = [["COD INSUMO", "PRODUTO", "OBRA", "CARGAS", "TOTAL", "BIPADO", "FALTANDO"]];
+      const body = [];
+
+      document.querySelectorAll("#tabelaRelatorio tr").forEach(row => {
+        const cells = Array.from(row.children).map(td => td.textContent);
+        body.push(cells);
+      });
+
+      doc.autoTable({
+        head: headers,
+        body: body,
+        startY: 25
+      });
+
+      doc.save("relatorio_carga.pdf");
     }
 
     document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
@@ -257,3 +242,4 @@
   </script>
 </body>
 </html>
+
