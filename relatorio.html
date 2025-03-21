@@ -12,7 +12,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
+      margin-top: 10px;
     }
     th, td {
       border: 1px solid #ccc;
@@ -22,18 +22,16 @@
     th {
       background-color: #f0f0f0;
     }
-
-    /* CORES DE STATUS */
-    .faltando-zero {
-      background-color: #d4edda; /* Verde - Atendido */
+    .verde { background-color: #d4edda; }
+    .amarelo { background-color: #fff3cd; }
+    .vermelho { background-color: #f8d7da; }
+    #filtros {
+      margin-bottom: 20px;
     }
-    .faltando-parcial {
-      background-color: #fff3cd; /* Amarelo - Parcialmente Atendido */
+    select {
+      padding: 8px;
+      margin: 0 10px;
     }
-    .faltando-total {
-      background-color: #f8d7da; /* Vermelho - Nada Bipado */
-    }
-
     #btn-voltar {
       margin-top: 20px;
       padding: 10px 20px;
@@ -43,6 +41,18 @@
 </head>
 <body>
   <h1>Relatório de Atendimento da Carga</h1>
+
+  <div id="filtros">
+    <label for="filtroObra">Filtrar por Obra:</label>
+    <select id="filtroObra">
+      <option value="">Todas</option>
+    </select>
+
+    <label for="filtroProduto">Filtrar por Produto:</label>
+    <select id="filtroProduto">
+      <option value="">Todos</option>
+    </select>
+  </div>
 
   <table>
     <thead>
@@ -64,45 +74,80 @@
   <button id="btn-voltar" onclick="window.location.href='/'">Voltar</button>
 
   <script>
+    let dadosOriginais = [];
+
+    function aplicarFiltros() {
+      const obra = document.getElementById("filtroObra").value;
+      const produto = document.getElementById("filtroProduto").value;
+
+      const tabela = document.getElementById('tabelaRelatorio');
+      tabela.innerHTML = '';
+
+      const dadosFiltrados = dadosOriginais.filter(item => {
+        return (!obra || item.obra === obra) && (!produto || item.produto === produto);
+      });
+
+      if (dadosFiltrados.length === 0) {
+        tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado com os filtros selecionados.</td></tr>';
+        return;
+      }
+
+      dadosFiltrados.forEach(item => {
+        const row = document.createElement('tr');
+        let classe = 'vermelho';
+        if (item.faltando === 0) {
+          classe = 'verde';
+        } else if (item.bipado > 0 && item.faltando > 0) {
+          classe = 'amarelo';
+        }
+
+        row.className = classe;
+        row.innerHTML = `
+          <td>${item.cod_insumo}</td>
+          <td>${item.produto}</td>
+          <td>${item.obra}</td>
+          <td>${item.cargas}</td>
+          <td>${item.total_necessario}</td>
+          <td>${item.bipado}</td>
+          <td>${item.faltando}</td>
+        `;
+        tabela.appendChild(row);
+      });
+    }
+
     fetch('/relatorio_diferencas')
       .then(res => res.json())
       .then(data => {
+        dadosOriginais = data;
         const tabela = document.getElementById('tabelaRelatorio');
-        tabela.innerHTML = '';
+        const filtroObra = document.getElementById("filtroObra");
+        const filtroProduto = document.getElementById("filtroProduto");
 
-        if (data.length === 0) {
-          tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
-          return;
-        }
+        const obras = [...new Set(data.map(i => i.obra))];
+        const produtos = [...new Set(data.map(i => i.produto))];
 
-        data.forEach(item => {
-          const row = document.createElement('tr');
-
-          row.innerHTML = `
-            <td>${item.cod_insumo}</td>
-            <td>${item.produto}</td>
-            <td>${item.obra}</td>
-            <td>${item.cargas}</td>
-            <td>${item.total_necessario}</td>
-            <td>${item.bipado}</td>
-            <td>${item.faltando}</td>
-          `;
-
-          // Lógica para definir a cor da linha
-          if (item.faltando === 0) {
-            row.className = 'faltando-zero'; // Verde
-          } else if (item.bipado > 0) {
-            row.className = 'faltando-parcial'; // Amarelo
-          } else {
-            row.className = 'faltando-total'; // Vermelho
-          }
-
-          tabela.appendChild(row);
+        obras.forEach(obra => {
+          const opt = document.createElement("option");
+          opt.value = obra;
+          opt.textContent = obra;
+          filtroObra.appendChild(opt);
         });
+
+        produtos.forEach(prod => {
+          const opt = document.createElement("option");
+          opt.value = prod;
+          opt.textContent = prod;
+          filtroProduto.appendChild(opt);
+        });
+
+        aplicarFiltros();
       })
       .catch(() => {
         document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Erro ao carregar dados.</td></tr>';
       });
+
+    document.getElementById("filtroObra").addEventListener("change", aplicarFiltros);
+    document.getElementById("filtroProduto").addEventListener("change", aplicarFiltros);
   </script>
 </body>
 </html>
