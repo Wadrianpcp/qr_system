@@ -4,39 +4,31 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# ✅ SUA URL REAL DO BANCO NEON:
 DATABASE_URL = "postgresql://neondb_owner:npg_lJHgpoh53QXM@ep-old-night-acgy3449-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require"
 
-# Conectar ao banco de dados
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
-# Página inicial (interface web)
 @app.route('/')
 def index():
     return send_file('index.html')
 
-# Página de registros
 @app.route('/registros')
 def registros():
     return send_file('registros.html')
 
-# Página para importar lista de carga
 @app.route('/importar')
 def importar_lista():
     return send_file('upload.html')
 
-# Página para visualizar a lista de carga
 @app.route('/lista_carga')
 def lista_carga():
     return send_file('lista_carga.html')
 
-# Página do relatório
 @app.route('/relatorio')
 def relatorio():
     return send_file('relatorio.html')
 
-# Rota para registrar um QR Code no banco
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
     data = request.json
@@ -48,7 +40,6 @@ def registrar_qr():
 
     conn = get_db_connection()
     cur = conn.cursor()
-
     try:
         cur.execute("INSERT INTO registros_qr (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
         conn.commit()
@@ -59,7 +50,6 @@ def registrar_qr():
         cur.close()
         conn.close()
 
-# Rota para listar os registros do banco
 @app.route('/listar_qr', methods=['GET'])
 def listar_qr():
     conn = get_db_connection()
@@ -72,23 +62,19 @@ def listar_qr():
     registros_formatados = [
         {"id": r[0], "codigo_qr": r[1], "data_hora": r[2], "usuario": r[3], "status": r[4]} for r in registros
     ]
-
     return jsonify(registros_formatados)
 
-# Rota para importar planilha Excel da lista de carga
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
     if 'arquivo' not in request.files:
         return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
 
     arquivo = request.files['arquivo']
-
     if arquivo.filename == '':
         return jsonify({'erro': 'Nome de arquivo vazio'}), 400
 
     try:
         df = pd.read_excel(arquivo)
-
         colunas_esperadas = ["COD INSUMO", "PRODUTO", "UHS", "OBRA", "CARGAS", "TOTAL", "PAV"]
         if not all(col in df.columns for col in colunas_esperadas):
             return jsonify({'erro': 'As colunas do Excel não correspondem às esperadas.'}), 400
@@ -114,7 +100,6 @@ def upload_lista_carga():
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
-# Rota para listar os dados da tabela "lista_de_carga"
 @app.route('/listar_carga', methods=['GET'])
 def listar_carga():
     conn = get_db_connection()
@@ -126,16 +111,14 @@ def listar_carga():
     conn.close()
 
     registros_formatados = [dict(zip(colunas, linha)) for linha in dados]
-
     return jsonify(registros_formatados)
 
-# Rota para gerar o relatório de comparação entre bipagem e lista de carga
 @app.route('/relatorio_diferencas', methods=['GET'])
 def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Contar quantas vezes cada código foi bipado
+    # Dados bipados
     cur.execute("""
         SELECT codigo_qr, COUNT(*) AS bipado
         FROM registros_qr
@@ -144,10 +127,11 @@ def relatorio_diferencas():
     bipados = cur.fetchall()
     bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Trazer todos os itens da lista de carga
+    # Agrupar lista de carga por cod_insumo
     cur.execute("""
-        SELECT cod_insumo, produto, obra, cargas, total, pav
+        SELECT cod_insumo, produto, obra, SUM(cargas), SUM(total), pav
         FROM lista_de_carga
+        GROUP BY cod_insumo, produto, obra, pav
     """)
     lista = cur.fetchall()
 
@@ -155,8 +139,7 @@ def relatorio_diferencas():
     for item in lista:
         cod_insumo, produto, obra, cargas, total, pav = item
         bipado = bipados_dict.get(cod_insumo, 0)
-        diferenca = int(total) - bipado
-
+        faltando = total - bipado
         relatorio.append({
             "cod_insumo": cod_insumo,
             "produto": produto,
@@ -164,7 +147,7 @@ def relatorio_diferencas():
             "cargas": cargas,
             "total_necessario": total,
             "bipado": bipado,
-            "faltando": diferenca
+            "faltando": faltando
         })
 
     cur.close()
