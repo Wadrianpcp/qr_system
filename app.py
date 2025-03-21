@@ -26,6 +26,11 @@ def registros():
 def importar_lista():
     return send_file('upload.html')
 
+# Página para visualizar a lista de carga
+@app.route('/lista_carga')
+def lista_carga():
+    return send_file('lista_carga.html')
+
 # Rota para registrar um QR Code no banco
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
@@ -103,6 +108,21 @@ def upload_lista_carga():
 
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
+
+# Rota para listar os dados da tabela "lista_de_carga"
+@app.route('/listar_carga', methods=['GET'])
+def listar_carga():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM lista_de_carga ORDER BY OBRA")
+    dados = cur.fetchall()
+    colunas = [desc[0] for desc in cur.description]
+    cur.close()
+    conn.close()
+
+    registros_formatados = [dict(zip(colunas, linha)) for linha in dados]
+
+    return jsonify(registros_formatados)
 
 if __name__ == '__main__':
     app.run(debug=True)
