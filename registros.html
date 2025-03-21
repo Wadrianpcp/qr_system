@@ -3,41 +3,78 @@
 <head>
   <meta charset="UTF-8" />
   <title>Registros de QR Codes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Roboto', sans-serif;
       text-align: center;
-      margin: 20px;
+      margin: 0;
+      padding: 20px;
+      background-color: #f7f9fc;
     }
+
+    h1 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    #mensagem {
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+
+    .mensagem.sucesso {
+      color: #2e7d32;
+    }
+
+    .mensagem.erro {
+      color: #c62828;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      background: white;
     }
+
     th, td {
-      border: 1px solid black;
-      padding: 10px;
+      border: 1px solid #ddd;
+      padding: 12px;
       text-align: center;
     }
+
     th {
+      background-color: #1976d2;
+      color: white;
+    }
+
+    tr:nth-child(even) {
       background-color: #f2f2f2;
     }
+
     button {
-      padding: 6px 10px;
-      background-color: #d9534f;
+      padding: 6px 12px;
+      background-color: #d32f2f;
       color: white;
       border: none;
+      border-radius: 4px;
       cursor: pointer;
     }
-    .mensagem {
-      margin-top: 15px;
-      font-weight: bold;
+
+    button:hover {
+      background-color: #b71c1c;
     }
-    .mensagem.sucesso {
-      color: green;
-    }
-    .mensagem.erro {
-      color: red;
+
+    @media (max-width: 768px) {
+      table {
+        font-size: 14px;
+      }
+
+      th, td {
+        padding: 8px;
+      }
     }
   </style>
 </head>
@@ -62,15 +99,22 @@
     </tbody>
   </table>
 
+  <audio id="audioOk" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+  <audio id="audioErro" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+
   <script>
+    const tabela = document.getElementById('tabelaRegistros');
+    const mensagem = document.getElementById('mensagem');
+    const audioOk = document.getElementById('audioOk');
+    const audioErro = document.getElementById('audioErro');
+
     function carregarRegistros() {
       fetch('/listar_qr')
         .then(response => response.json())
         .then(data => {
-          const tabela = document.getElementById('tabelaRegistros');
           tabela.innerHTML = "";
 
-          if (data.length === 0) {
+          if (!data.length) {
             tabela.innerHTML = "<tr><td colspan='6'>Nenhum registro encontrado.</td></tr>";
             return;
           }
@@ -88,8 +132,8 @@
             tabela.innerHTML += row;
           });
         })
-        .catch(error => {
-          document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='6'>Erro ao carregar dados.</td></tr>";
+        .catch(() => {
+          tabela.innerHTML = "<tr><td colspan='6'>Erro ao carregar dados.</td></tr>";
         });
     }
 
@@ -97,32 +141,33 @@
       const senha = prompt("Digite a senha para excluir o registro:");
       if (senha !== "@pcp1234") {
         mostrarMensagem("Senha incorreta. Ação não autorizada.", false);
+        audioErro.play();
         return;
       }
 
       fetch(`/excluir_qr/${id}`, {
         method: 'DELETE'
       })
-        .then(res => res.json())
-        .then(res => {
-          if (res.sucesso) {
-            mostrarMensagem("Registro excluído com sucesso!", true);
-            carregarRegistros();
-            new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg').play();
-          } else {
-            mostrarMensagem("Erro ao excluir o registro.", false);
-            new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play();
-          }
-        })
-        .catch(() => {
-          mostrarMensagem("Erro ao comunicar com o servidor.", false);
-        });
+      .then(res => res.json())
+      .then(res => {
+        if (res.sucesso) {
+          mostrarMensagem("Registro excluído com sucesso!", true);
+          audioOk.play();
+          carregarRegistros();
+        } else {
+          mostrarMensagem("Erro ao excluir o registro.", false);
+          audioErro.play();
+        }
+      })
+      .catch(() => {
+        mostrarMensagem("Erro ao comunicar com o servidor.", false);
+        audioErro.play();
+      });
     }
 
     function mostrarMensagem(msg, sucesso) {
-      const el = document.getElementById("mensagem");
-      el.textContent = msg;
-      el.className = "mensagem " + (sucesso ? "sucesso" : "erro");
+      mensagem.textContent = msg;
+      mensagem.className = "mensagem " + (sucesso ? "sucesso" : "erro");
     }
 
     window.onload = carregarRegistros;
