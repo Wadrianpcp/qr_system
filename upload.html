@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Importar Lista de Carga</title>
+</head>
+<body>
+    <h1>Importar Lista de Carga (Excel)</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="arquivo" accept=".xlsx,.xls">
+        <button type="submit">Enviar</button>
+    </form>
+    <p id="mensagem"></p>
+
+    <script>
+        document.getElementById("uploadForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+
+            fetch('/upload_lista_carga', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("mensagem").innerText = data.mensagem || data.erro;
+            })
+            .catch(error => {
+                document.getElementById("mensagem").innerText = "Erro ao enviar arquivo.";
+                console.error(error);
+            });
+        });
+    </script>
+</body>
+</html>
