@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório de Atendimento da Carga</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    .completo {
+      background-color: #d4edda;
+    }
+    .parcial {
+      background-color: #fff3cd;
+    }
+    .faltando {
+      background-color: #f8d7da;
+    }
+    #btn-voltar {
+      margin-top: 20px;
+      padding: 10px 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Relatório de Atendimento da Carga</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Código do Insumo</th>
+        <th>Produto</th>
+        <th>Total Solicitado</th>
+        <th>Quantidade Bipado</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="tabelaRelatorio">
+      <tr><td colspan="5">Carregando dados...</td></tr>
+    </tbody>
+  </table>
+  <button id="btn-voltar" onclick="window.location.href='/'">Voltar</button>
+
+  <script>
+    fetch('/relatorio_carga')
+      .then(res => res.json())
+      .then(data => {
+        const tabela = document.getElementById('tabelaRelatorio');
+        tabela.innerHTML = '';
+
+        if (data.length === 0) {
+          tabela.innerHTML = '<tr><td colspan="5">Nenhum dado encontrado.</td></tr>';
+          return;
+        }
+
+        data.forEach(item => {
+          let statusClass = '';
+          if (item.status === 'COMPLETO') statusClass = 'completo';
+          else if (item.status === 'PARCIAL') statusClass = 'parcial';
+          else statusClass = 'faltando';
+
+          tabela.innerHTML += `
+            <tr class="${statusClass}">
+              <td>${item.cod_insumo}</td>
+              <td>${item.produto}</td>
+              <td>${item.total}</td>
+              <td>${item.quantidade_bipada}</td>
+              <td>${item.status}</td>
+            </tr>
+          `;
+        });
+      })
+      .catch(() => {
+        document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="5">Erro ao carregar dados.</td></tr>';
+      });
+  </script>
+</body>
+</html>
