@@ -12,118 +12,109 @@
     }
 
     .top-bar {
-      background-color: #f4f4f4;
-      padding: 15px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      z-index: 1000;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .top-bar input, .top-bar button {
       padding: 10px;
-      font-size: 16px;
-      margin-left: 10px;
+      background-color: #f5f5f5;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    .content {
-      padding-top: 80px;
-      text-align: center;
+    #usuario, #qrInput {
+      padding: 10px;
+      margin-right: 10px;
+      font-size: 16px;
     }
 
     #mensagem {
-      margin-top: 20px;
+      margin: 10px;
       font-weight: bold;
       color: green;
     }
 
-    #display-codigo {
+    #display {
       position: fixed;
       top: 0;
       left: 0;
-      width: 100%;
-      height: 100%;
+      width: 100vw;
+      height: 100vh;
       background-color: black;
       color: limegreen;
+      font-size: 5vw;
       display: flex;
-      justify-content: center;
       align-items: center;
-      font-size: 5em;
-      font-weight: bold;
-      z-index: 999;
+      justify-content: center;
       display: none;
+      z-index: 999;
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .slider-container input {
+      margin-left: 10px;
     }
   </style>
 </head>
 <body>
   <div class="top-bar">
-    <div>
-      <label for="usuario">Usuário:</label>
-      <input type="text" id="usuario" placeholder="Seu nome">
-    </div>
-    <div>
-      <label for="qrInput">Código QR:</label>
-      <input type="text" id="qrInput" placeholder="Escaneie aqui" autofocus>
+    <input type="text" id="usuario" placeholder="Seu nome" />
+    <input type="text" id="qrInput" placeholder="Escaneie o QR Code" autofocus />
+    <div class="slider-container">
+      <label for="tempoExibicao">Exibir (ms):</label>
+      <input type="range" id="tempoExibicao" min="500" max="3000" value="1000" step="100" />
     </div>
     <button onclick="irParaRegistros()">Ver Registros</button>
   </div>
 
-  <div class="content">
-    <h1>Registro de QR Code</h1>
-    <p id="mensagem"></p>
-  </div>
+  <div id="mensagem"></div>
 
-  <div id="display-codigo"></div>
+  <div id="display"></div>
 
   <script>
-    document.getElementById("qrInput").addEventListener("keypress", function (e) {
-      if (e.key === "Enter") {
-        registrarQRCode();
+    const qrInput = document.getElementById("qrInput");
+    const display = document.getElementById("display");
+
+    qrInput.addEventListener("keypress", function (event) {
+      if (event.key === "Enter") {
+        const codigo_qr = qrInput.value.trim();
+        const usuario = document.getElementById("usuario").value.trim();
+        const tempo = parseInt(document.getElementById("tempoExibicao").value);
+
+        if (!codigo_qr || !usuario) {
+          alert("Digite seu nome e escaneie um QR válido.");
+          return;
+        }
+
+        // Exibe em tela cheia
+        display.innerText = codigo_qr;
+        display.style.display = "flex";
+
+        // Envia ao backend
+        fetch("/registrar_qr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ codigo_qr, usuario }),
+        })
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("mensagem").innerText = data.mensagem || "Erro ao registrar.";
+        })
+        .catch(err => {
+          console.error("Erro:", err);
+          document.getElementById("mensagem").innerText = "Erro ao registrar.";
+        });
+
+        // Limpa input e oculta tela cheia após tempo configurado
+        qrInput.value = "";
+        setTimeout(() => {
+          display.style.display = "none";
+          qrInput.focus();
+        }, tempo);
       }
     });
-
-    function registrarQRCode() {
-      const codigo_qr = document.getElementById("qrInput").value.trim();
-      const usuario = document.getElementById("usuario").value.trim();
-
-      if (!codigo_qr || !usuario) {
-        alert("Preencha o nome e o QR Code!");
-        return;
-      }
-
-      fetch("/registrar_qr", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ codigo_qr, usuario }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          document.getElementById("mensagem").innerText = data.mensagem || data.erro;
-          exibirCodigoNaTela(codigo_qr);
-          document.getElementById("qrInput").value = ""; // Limpa o input
-        })
-        .catch((err) => {
-          console.error("Erro:", err);
-        });
-    }
-
-    function exibirCodigoNaTela(codigo) {
-      const display = document.getElementById("display-codigo");
-      display.innerText = codigo;
-      display.style.display = "flex";
-
-      setTimeout(() => {
-        display.style.display = "none";
-        document.getElementById("qrInput").focus();
-      }, 3000);
-    }
 
     function irParaRegistros() {
       window.location.href = "/registros";
