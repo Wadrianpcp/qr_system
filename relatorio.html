@@ -71,6 +71,9 @@
     <label>Produto:
       <select id="filtroProduto"><option value="">Todos</option></select>
     </label>
+    <label>Cargas:
+      <select id="filtroCargas"><option value="">Todas</option></select>
+    </label>
     <label>Status:
       <select id="filtroStatus">
         <option value="">Todos</option>
@@ -82,7 +85,9 @@
   </div>
 
   <div id="resumo">
-    <p>Total Atendidos: <span id="resumoVerde">0</span> | Não Atendidos: <span id="resumoVermelho">0</span> | Total de Itens: <span id="resumoTotal">0</span></p>
+    <p>Total Atendidos: <span id="resumoVerde">0</span> |
+       Não Atendidos: <span id="resumoVermelho">0</span> |
+       Total de Itens: <span id="resumoTotal">0</span></p>
   </div>
 
   <div class="btn-container">
@@ -132,9 +137,11 @@
     function preencherFiltros(data) {
       const obras = [...new Set(data.map(d => d.obra))];
       const produtos = [...new Set(data.map(d => d.produto))];
+      const cargas = [...new Set(data.map(d => d.cargas))];
 
       const obraSelect = document.getElementById('filtroObra');
       const produtoSelect = document.getElementById('filtroProduto');
+      const cargasSelect = document.getElementById('filtroCargas');
 
       obras.forEach(obra => {
         const opt = document.createElement('option');
@@ -149,11 +156,19 @@
         opt.textContent = prod;
         produtoSelect.appendChild(opt);
       });
+
+      cargas.forEach(carga => {
+        const opt = document.createElement('option');
+        opt.value = carga;
+        opt.textContent = carga;
+        cargasSelect.appendChild(opt);
+      });
     }
 
     function renderizarTabela(data) {
       const filtroObra = document.getElementById('filtroObra').value;
       const filtroProduto = document.getElementById('filtroProduto').value;
+      const filtroCargas = document.getElementById('filtroCargas').value;
       const filtroStatus = document.getElementById('filtroStatus').value;
 
       const tabela = document.getElementById('tabelaRelatorio');
@@ -169,9 +184,10 @@
 
         const condObra = !filtroObra || item.obra === filtroObra;
         const condProd = !filtroProduto || item.produto === filtroProduto;
+        const condCargas = !filtroCargas || item.cargas === filtroCargas;
         const condStatus = !filtroStatus || status === filtroStatus;
 
-        return condObra && condProd && condStatus;
+        return condObra && condProd && condCargas && condStatus;
       });
 
       if (filtrado.length === 0) {
@@ -219,7 +235,6 @@
       const tabela = document.querySelector("table");
       const wb = XLSX.utils.table_to_book(tabela, { sheet: "Relatório" });
 
-      // Adiciona rodapé no final da planilha
       const ws = wb.Sheets["Relatório"];
       const ultimaLinha = XLSX.utils.decode_range(ws['!ref']).e.r + 2;
       const cellAddress = `A${ultimaLinha}`;
@@ -260,6 +275,7 @@
 
     document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
     document.getElementById('filtroProduto').addEventListener('change', () => renderizarTabela(dadosGlobais));
+    document.getElementById('filtroCargas').addEventListener('change', () => renderizarTabela(dadosGlobais));
     document.getElementById('filtroStatus').addEventListener('change', () => renderizarTabela(dadosGlobais));
 
     carregarRelatorio();
