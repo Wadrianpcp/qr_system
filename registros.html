@@ -3,78 +3,42 @@
 <head>
   <meta charset="UTF-8" />
   <title>Registros de QR Codes</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: 'Roboto', sans-serif;
+      font-family: Arial, sans-serif;
       text-align: center;
-      margin: 0;
-      padding: 20px;
-      background-color: #f7f9fc;
+      margin: 20px;
     }
-
-    h1 {
-      margin-bottom: 20px;
-      color: #333;
-    }
-
-    #mensagem {
-      margin-bottom: 20px;
-      font-weight: bold;
-    }
-
-    .mensagem.sucesso {
-      color: #2e7d32;
-    }
-
-    .mensagem.erro {
-      color: #c62828;
-    }
-
     table {
       width: 100%;
       border-collapse: collapse;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      background: white;
+      margin-top: 20px;
     }
-
     th, td {
-      border: 1px solid #ddd;
-      padding: 12px;
+      border: 1px solid black;
+      padding: 10px;
       text-align: center;
     }
-
     th {
-      background-color: #1976d2;
-      color: white;
-    }
-
-    tr:nth-child(even) {
       background-color: #f2f2f2;
     }
-
     button {
-      padding: 6px 12px;
-      background-color: #d32f2f;
+      padding: 6px 10px;
+      background-color: #d9534f;
       color: white;
       border: none;
-      border-radius: 4px;
       cursor: pointer;
+      border-radius: 5px;
     }
-
-    button:hover {
-      background-color: #b71c1c;
+    .mensagem {
+      margin-top: 15px;
+      font-weight: bold;
     }
-
-    @media (max-width: 768px) {
-      table {
-        font-size: 14px;
-      }
-
-      th, td {
-        padding: 8px;
-      }
+    .mensagem.sucesso {
+      color: green;
+    }
+    .mensagem.erro {
+      color: red;
     }
   </style>
 </head>
@@ -99,22 +63,22 @@
     </tbody>
   </table>
 
-  <audio id="audioOk" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
-  <audio id="audioErro" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+  <!-- Sons -->
+  <audio id="somSucesso" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+  <audio id="somErro" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
 
   <script>
-    const tabela = document.getElementById('tabelaRegistros');
-    const mensagem = document.getElementById('mensagem');
-    const audioOk = document.getElementById('audioOk');
-    const audioErro = document.getElementById('audioErro');
+    const somSucesso = document.getElementById("somSucesso");
+    const somErro = document.getElementById("somErro");
 
     function carregarRegistros() {
       fetch('/listar_qr')
         .then(response => response.json())
         .then(data => {
+          const tabela = document.getElementById('tabelaRegistros');
           tabela.innerHTML = "";
 
-          if (!data.length) {
+          if (data.length === 0) {
             tabela.innerHTML = "<tr><td colspan='6'>Nenhum registro encontrado.</td></tr>";
             return;
           }
@@ -132,8 +96,8 @@
             tabela.innerHTML += row;
           });
         })
-        .catch(() => {
-          tabela.innerHTML = "<tr><td colspan='6'>Erro ao carregar dados.</td></tr>";
+        .catch(error => {
+          document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='6'>Erro ao carregar dados.</td></tr>";
         });
     }
 
@@ -141,33 +105,34 @@
       const senha = prompt("Digite a senha para excluir o registro:");
       if (senha !== "@pcp1234") {
         mostrarMensagem("Senha incorreta. Ação não autorizada.", false);
-        audioErro.play();
+        somErro.play();
         return;
       }
 
-      fetch(`/excluir_qr/${id}`, {
+      fetch(`/excluir_qr/${id}?senha=${encodeURIComponent(senha)}`, {
         method: 'DELETE'
       })
-      .then(res => res.json())
-      .then(res => {
-        if (res.sucesso) {
-          mostrarMensagem("Registro excluído com sucesso!", true);
-          audioOk.play();
-          carregarRegistros();
-        } else {
-          mostrarMensagem("Erro ao excluir o registro.", false);
-          audioErro.play();
-        }
-      })
-      .catch(() => {
-        mostrarMensagem("Erro ao comunicar com o servidor.", false);
-        audioErro.play();
-      });
+        .then(res => res.json())
+        .then(res => {
+          if (res.sucesso) {
+            mostrarMensagem("Registro excluído com sucesso!", true);
+            carregarRegistros();
+            somSucesso.play();
+          } else {
+            mostrarMensagem(res.erro || "Erro ao excluir o registro.", false);
+            somErro.play();
+          }
+        })
+        .catch(() => {
+          mostrarMensagem("Erro ao comunicar com o servidor.", false);
+          somErro.play();
+        });
     }
 
     function mostrarMensagem(msg, sucesso) {
-      mensagem.textContent = msg;
-      mensagem.className = "mensagem " + (sucesso ? "sucesso" : "erro");
+      const el = document.getElementById("mensagem");
+      el.textContent = msg;
+      el.className = "mensagem " + (sucesso ? "sucesso" : "erro");
     }
 
     window.onload = carregarRegistros;
