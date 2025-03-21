@@ -7,14 +7,33 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 50px;
+      margin: 0;
+      padding: 0;
     }
 
-    input, button {
+    .top-bar {
+      background-color: #f4f4f4;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .top-bar input, .top-bar button {
       padding: 10px;
-      margin: 10px;
       font-size: 16px;
+      margin-left: 10px;
+    }
+
+    .content {
+      padding-top: 80px;
+      text-align: center;
     }
 
     #mensagem {
@@ -42,72 +61,68 @@
   </style>
 </head>
 <body>
-  <h1>Registro de QR Code</h1>
+  <div class="top-bar">
+    <div>
+      <label for="usuario">Usuário:</label>
+      <input type="text" id="usuario" placeholder="Seu nome">
+    </div>
+    <div>
+      <label for="qrInput">Código QR:</label>
+      <input type="text" id="qrInput" placeholder="Escaneie aqui" autofocus>
+    </div>
+    <button onclick="irParaRegistros()">Ver Registros</button>
+  </div>
 
-  <label for="usuario">Nome do Usuário:</label>
-  <input type="text" id="usuario" placeholder="Digite seu nome" />
-
-  <br />
-  <button onclick="iniciarBipagem()">Bipar QR Code</button>
-  <button onclick="irParaRegistros()">Ver Registros</button>
-
-  <p id="mensagem"></p>
+  <div class="content">
+    <h1>Registro de QR Code</h1>
+    <p id="mensagem"></p>
+  </div>
 
   <div id="display-codigo"></div>
 
   <script>
-    function iniciarBipagem() {
-      biparQRCode();
-    }
-
-    function biparQRCode() {
-      let codigo_qr = prompt("Escaneie o QR Code ou digite o código:");
-
-      if (codigo_qr) {
-        let usuario = document.getElementById("usuario").value;
-
-        if (!usuario) {
-          alert("Por favor, digite seu nome antes de bipar!");
-          return;
-        }
-
-        fetch("/registrar_qr", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            codigo_qr: codigo_qr,
-            usuario: usuario,
-          }),
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            document.getElementById("mensagem").innerText = data.mensagem || data.erro;
-
-            exibirCodigoNaTela(codigo_qr);
-
-            // Espera 3 segundos antes de permitir o próximo bip
-            setTimeout(() => {
-              esconderCodigo();
-              biparQRCode();
-            }, 3000);
-          })
-          .catch((error) => {
-            console.error("Erro:", error);
-          });
+    document.getElementById("qrInput").addEventListener("keypress", function (e) {
+      if (e.key === "Enter") {
+        registrarQRCode();
       }
+    });
+
+    function registrarQRCode() {
+      const codigo_qr = document.getElementById("qrInput").value.trim();
+      const usuario = document.getElementById("usuario").value.trim();
+
+      if (!codigo_qr || !usuario) {
+        alert("Preencha o nome e o QR Code!");
+        return;
+      }
+
+      fetch("/registrar_qr", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ codigo_qr, usuario }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          document.getElementById("mensagem").innerText = data.mensagem || data.erro;
+          exibirCodigoNaTela(codigo_qr);
+          document.getElementById("qrInput").value = ""; // Limpa o input
+        })
+        .catch((err) => {
+          console.error("Erro:", err);
+        });
     }
 
     function exibirCodigoNaTela(codigo) {
       const display = document.getElementById("display-codigo");
       display.innerText = codigo;
       display.style.display = "flex";
-    }
 
-    function esconderCodigo() {
-      const display = document.getElementById("display-codigo");
-      display.style.display = "none";
+      setTimeout(() => {
+        display.style.display = "none";
+        document.getElementById("qrInput").focus();
+      }, 3000);
     }
 
     function irParaRegistros() {
@@ -116,4 +131,3 @@
   </script>
 </body>
 </html>
-
