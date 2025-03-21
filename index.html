@@ -4,68 +4,55 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Registro de QR Code</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Roboto', sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f3f3f3;
+      background-color: #f9f9f9;
     }
 
     .container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 40px 20px;
+      padding: 20px;
+      text-align: center;
     }
 
     h1 {
-      margin-bottom: 30px;
       color: #333;
     }
 
-    .input-group {
+    .top-bar {
       display: flex;
       flex-wrap: wrap;
+      gap: 10px;
       justify-content: center;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    input[type="text"], input[type="number"] {
-      padding: 12px;
-      font-size: 16px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      min-width: 250px;
-    }
-
-    .slider-container {
-      display: flex;
       align-items: center;
-      gap: 10px;
       margin-bottom: 20px;
+    }
+
+    input[type="text"], input[type="range"] {
+      padding: 10px;
+      font-size: 16px;
+      width: 200px;
     }
 
     button {
-      padding: 12px 20px;
+      padding: 10px 20px;
       font-size: 16px;
-      font-weight: bold;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      background-color: #4CAF50;
+      background-color: #1976d2;
       color: white;
-      transition: background-color 0.3s ease;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
     }
 
     button:hover {
-      background-color: #388e3c;
+      background-color: #125ea8;
     }
 
     #mensagem {
-      margin-top: 15px;
+      margin: 10px;
       font-weight: bold;
       color: green;
     }
@@ -78,22 +65,37 @@
       height: 100vh;
       background-color: black;
       color: limegreen;
-      font-size: 6vw;
+      font-size: 5vw;
       display: flex;
       align-items: center;
       justify-content: center;
       display: none;
       z-index: 999;
-      transition: all 0.3s ease-in-out;
     }
 
-    @media (max-width: 600px) {
-      input[type="text"] {
-        width: 100%;
-      }
-      button {
-        width: 100%;
-      }
+    #historico {
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    #historico ul {
+      list-style: none;
+      padding: 0;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    #historico li {
+      background: #eee;
+      margin-bottom: 5px;
+      padding: 8px;
+      border-radius: 4px;
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
   </style>
 </head>
@@ -101,30 +103,88 @@
   <div class="container">
     <h1>Registro de QR Code</h1>
 
-    <div class="input-group">
+    <div class="top-bar">
       <input type="text" id="usuario" placeholder="Seu nome" />
       <input type="text" id="qrInput" placeholder="Escaneie o QR Code" autofocus />
-    </div>
 
-    <div class="slider-container">
-      <label for="tempoExibicao">Tempo de exibição (ms):</label>
-      <input type="range" id="tempoExibicao" min="300" max="3000" value="1000" step="100" />
-    </div>
+      <div class="slider-container">
+        <label for="tempoExibicao">Exibir (ms):</label>
+        <input type="range" id="tempoExibicao" min="500" max="3000" value="1000" step="100" />
+      </div>
 
-    <div class="input-group">
-      <button onclick="irParaRegistros()">Ver Registros</button>
-      <button onclick="irParaUpload()">Importar Lista de Carga</button>
-      <button onclick="irParaRelatorio()">Ver Relatório</button>
+      <button onclick="window.location.href='/registros'">Ver Registros</button>
+      <button onclick="window.location.href='/importar'">Importar Carga</button>
+      <button onclick="window.location.href='/relatorio'">Relatório</button>
     </div>
 
     <div id="mensagem"></div>
+    <div id="display"></div>
+
+    <div id="historico">
+      <h3>Últimos 10 QR Codes bipados:</h3>
+      <ul id="listaHistorico"></ul>
+    </div>
   </div>
 
-  <div id="display"></div>
+  <!-- Sons -->
+  <audio id="sucesso" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
+  <audio id="erro" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
 
   <script>
     const qrInput = document.getElementById("qrInput");
     const display = document.getElementById("display");
+    const listaHistorico = document.getElementById("listaHistorico");
+    const sucessoAudio = document.getElementById("sucesso");
+    const erroAudio = document.getElementById("erro");
+    let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
+
+    function atualizarHistorico(qr) {
+      historico.unshift(qr);
+      if (historico.length > 10) historico.pop();
+      localStorage.setItem("historico_qr", JSON.stringify(historico));
+      renderizarHistorico();
+    }
+
+    function renderizarHistorico() {
+      listaHistorico.innerHTML = "";
+      historico.forEach(qr => {
+        const li = document.createElement("li");
+        li.textContent = qr;
+        listaHistorico.appendChild(li);
+      });
+    }
+
+    function exibirDisplay(texto, tempo) {
+      display.textContent = texto;
+      display.style.display = "flex";
+      document.documentElement.requestFullscreen?.();
+      setTimeout(() => {
+        display.style.display = "none";
+        qrInput.focus();
+      }, tempo);
+    }
+
+    function sincronizarOffline() {
+      const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
+      if (offlineData.length === 0) return;
+
+      offlineData.forEach(item => {
+        fetch("/registrar_qr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item)
+        })
+        .then(res => res.json())
+        .then(() => {
+          sucessoAudio.play();
+          offlineData.shift(); // remove item enviado
+          localStorage.setItem("offline_qr", JSON.stringify(offlineData));
+        })
+        .catch(() => {
+          erroAudio.play();
+        });
+      });
+    }
 
     qrInput.addEventListener("keypress", function (event) {
       if (event.key === "Enter") {
@@ -133,46 +193,42 @@
         const tempo = parseInt(document.getElementById("tempoExibicao").value);
 
         if (!codigo_qr || !usuario) {
-          alert("Digite seu nome e escaneie um QR válido.");
+          alert("Preencha o nome e o QR Code!");
           return;
         }
 
-        display.innerText = codigo_qr;
-        display.style.display = "flex";
+        exibirDisplay(codigo_qr, tempo);
 
         fetch("/registrar_qr", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ codigo_qr, usuario }),
+          body: JSON.stringify({ codigo_qr, usuario })
         })
         .then(res => res.json())
         .then(data => {
-          document.getElementById("mensagem").innerText = data.mensagem || "Erro ao registrar.";
+          if (data.mensagem) {
+            document.getElementById("mensagem").textContent = data.mensagem;
+            sucessoAudio.play();
+            atualizarHistorico(codigo_qr);
+          } else {
+            erroAudio.play();
+            document.getElementById("mensagem").textContent = data.erro || "Erro ao registrar.";
+          }
         })
-        .catch(err => {
-          console.error("Erro:", err);
-          document.getElementById("mensagem").innerText = "Erro ao registrar.";
+        .catch(() => {
+          erroAudio.play();
+          document.getElementById("mensagem").textContent = "Sem conexão. Salvando offline.";
+          const offline = JSON.parse(localStorage.getItem("offline_qr")) || [];
+          offline.push({ codigo_qr, usuario });
+          localStorage.setItem("offline_qr", JSON.stringify(offline));
         });
 
         qrInput.value = "";
-        setTimeout(() => {
-          display.style.display = "none";
-          qrInput.focus();
-        }, tempo);
       }
     });
 
-    function irParaRegistros() {
-      window.location.href = "/registros";
-    }
-
-    function irParaUpload() {
-      window.location.href = "/importar";
-    }
-
-    function irParaRelatorio() {
-      window.location.href = "/relatorio";
-    }
+    renderizarHistorico();
+    sincronizarOffline();
   </script>
 </body>
 </html>
