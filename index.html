@@ -47,7 +47,7 @@
                 }
 
                 // Enviar o QR Code para o servidor Flask
-                fetch('http://127.0.0.1:5000/registrar_qr', {
+                fetch('/registrar_qr', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -59,9 +59,12 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById("mensagem").innerText = data.mensagem;
+                    document.getElementById("mensagem").innerText = data.mensagem || data.erro;
                 })
-                .catch(error => console.error("Erro:", error));
+                .catch(error => {
+                    console.error("Erro:", error);
+                    document.getElementById("mensagem").innerText = "Erro ao registrar QR Code.";
+                });
             }
         }
 
