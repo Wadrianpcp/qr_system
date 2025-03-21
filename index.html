@@ -14,14 +14,15 @@
     .top-bar {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       padding: 10px;
       background-color: #f5f5f5;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      gap: 10px;
     }
 
     #usuario, #qrInput {
       padding: 10px;
-      margin-right: 10px;
       font-size: 16px;
     }
 
@@ -50,11 +51,16 @@
     .slider-container {
       display: flex;
       align-items: center;
-      margin-left: auto;
     }
 
     .slider-container input {
       margin-left: 10px;
+    }
+
+    button {
+      padding: 10px;
+      font-size: 16px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -62,15 +68,17 @@
   <div class="top-bar">
     <input type="text" id="usuario" placeholder="Seu nome" />
     <input type="text" id="qrInput" placeholder="Escaneie o QR Code" autofocus />
+    
     <div class="slider-container">
       <label for="tempoExibicao">Exibir (ms):</label>
       <input type="range" id="tempoExibicao" min="500" max="3000" value="1000" step="100" />
     </div>
+
     <button onclick="irParaRegistros()">Ver Registros</button>
+    <button onclick="irParaUpload()">Importar Lista de Carga</button>
   </div>
 
   <div id="mensagem"></div>
-
   <div id="display"></div>
 
   <script>
@@ -88,11 +96,9 @@
           return;
         }
 
-        // Exibe em tela cheia
         display.innerText = codigo_qr;
         display.style.display = "flex";
 
-        // Envia ao backend
         fetch("/registrar_qr", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -107,7 +113,6 @@
           document.getElementById("mensagem").innerText = "Erro ao registrar.";
         });
 
-        // Limpa input e oculta tela cheia após tempo configurado
         qrInput.value = "";
         setTimeout(() => {
           display.style.display = "none";
@@ -118,6 +123,10 @@
 
     function irParaRegistros() {
       window.location.href = "/registros";
+    }
+
+    function irParaUpload() {
+      window.location.href = "/importar";
     }
   </script>
 </body>
