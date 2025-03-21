@@ -118,7 +118,6 @@ def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Dados bipados
     cur.execute("""
         SELECT codigo_qr, COUNT(*) AS bipado
         FROM registros_qr
@@ -127,7 +126,6 @@ def relatorio_diferencas():
     bipados = cur.fetchall()
     bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Agrupar lista de carga por cod_insumo
     cur.execute("""
         SELECT cod_insumo, produto, obra, SUM(cargas), SUM(total), pav
         FROM lista_de_carga
@@ -144,10 +142,10 @@ def relatorio_diferencas():
             "cod_insumo": cod_insumo,
             "produto": produto,
             "obra": obra,
-            "cargas": cargas,
-            "total_necessario": total,
-            "bipado": bipado,
-            "faltando": faltando
+            "cargas": int(cargas),
+            "total_necessario": int(total),
+            "bipado": int(bipado),
+            "faltando": int(faltando)
         })
 
     cur.close()
