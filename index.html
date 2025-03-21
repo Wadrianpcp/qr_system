@@ -6,20 +6,29 @@
   <title>Registro de QR Code</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: 'Roboto', sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f9f9f9;
+      background-color: #f4f6f8;
+      color: #333;
     }
 
-    .container {
+    header {
+      background-color: #1976d2;
+      color: white;
       padding: 20px;
       text-align: center;
     }
 
-    h1 {
-      color: #333;
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
     }
 
     .top-bar {
@@ -43,8 +52,8 @@
       background-color: #1976d2;
       color: white;
       border: none;
-      cursor: pointer;
       border-radius: 5px;
+      cursor: pointer;
     }
 
     button:hover {
@@ -52,9 +61,10 @@
     }
 
     #mensagem {
-      margin: 10px;
+      margin-top: 15px;
       font-weight: bold;
       color: green;
+      text-align: center;
     }
 
     #display {
@@ -65,7 +75,7 @@
       height: 100vh;
       background-color: black;
       color: limegreen;
-      font-size: 5vw;
+      font-size: 6vw;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -82,11 +92,11 @@
       list-style: none;
       padding: 0;
       max-width: 500px;
-      margin: 0 auto;
+      margin: auto;
     }
 
     #historico li {
-      background: #eee;
+      background: #e0e0e0;
       margin-bottom: 5px;
       padding: 8px;
       border-radius: 4px;
@@ -97,12 +107,29 @@
       align-items: center;
       gap: 10px;
     }
+
+    @media (max-width: 600px) {
+      input[type="text"], input[type="range"] {
+        width: 100%;
+      }
+
+      .top-bar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      button {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
+  <header>
     <h1>Registro de QR Code</h1>
+  </header>
 
+  <div class="container">
     <div class="top-bar">
       <input type="text" id="usuario" placeholder="Seu nome" />
       <input type="text" id="qrInput" placeholder="Escaneie o QR Code" autofocus />
@@ -168,7 +195,7 @@
       const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
       if (offlineData.length === 0) return;
 
-      offlineData.forEach(item => {
+      offlineData.forEach((item, index) => {
         fetch("/registrar_qr", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -177,7 +204,7 @@
         .then(res => res.json())
         .then(() => {
           sucessoAudio.play();
-          offlineData.shift(); // remove item enviado
+          offlineData.splice(index, 1);
           localStorage.setItem("offline_qr", JSON.stringify(offlineData));
         })
         .catch(() => {
