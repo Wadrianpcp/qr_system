@@ -29,6 +29,7 @@ def lista_carga():
 def relatorio():
     return send_file('relatorio.html')
 
+# Registrar QR Code
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
     data = request.json
@@ -40,7 +41,13 @@ def registrar_qr():
 
     conn = get_db_connection()
     cur = conn.cursor()
+
     try:
+        # Verifica se já foi bipado
+        cur.execute("SELECT COUNT(*) FROM registros_qr WHERE codigo_qr = %s", (codigo_qr,))
+        if cur.fetchone()[0] > 0:
+            return jsonify({"erro": "QR Code já bipado!"}), 409
+
         cur.execute("INSERT INTO registros_qr (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
         conn.commit()
         return jsonify({"mensagem": "QR Code registrado com sucesso!"}), 201
@@ -50,6 +57,7 @@ def registrar_qr():
         cur.close()
         conn.close()
 
+# Listar registros
 @app.route('/listar_qr', methods=['GET'])
 def listar_qr():
     conn = get_db_connection()
@@ -64,6 +72,31 @@ def listar_qr():
     ]
     return jsonify(registros_formatados)
 
+# Apagar um QR Code (com senha)
+@app.route('/apagar_qr', methods=['POST'])
+def apagar_qr():
+    data = request.json
+    codigo_qr = data.get('codigo_qr')
+    senha = data.get('senha')
+
+    if senha != "@pcp1234":
+        return jsonify({"erro": "Senha incorreta!"}), 403
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM registros_qr WHERE codigo_qr = %s", (codigo_qr,))
+        if cur.rowcount == 0:
+            return jsonify({"erro": "Registro não encontrado."}), 404
+        conn.commit()
+        return jsonify({"mensagem": f"QR Code {codigo_qr} removido com sucesso!"})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# Upload da lista de carga
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
     if 'arquivo' not in request.files:
@@ -88,18 +121,17 @@ def upload_lista_carga():
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (
                 row["COD INSUMO"], row["PRODUTO"], row["UHS"], row["OBRA"],
-                row["CARGAS"], row["TOTAL"], row["PAV"]
+                row["CARGAS"], int(row["TOTAL"]), row["PAV"]
             ))
 
         conn.commit()
         cur.close()
         conn.close()
-
         return jsonify({'mensagem': 'Lista de carga importada com sucesso.'}), 200
-
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
+# Listar lista de carga
 @app.route('/listar_carga', methods=['GET'])
 def listar_carga():
     conn = get_db_connection()
@@ -109,16 +141,15 @@ def listar_carga():
     colunas = [desc[0] for desc in cur.description]
     cur.close()
     conn.close()
-
     registros_formatados = [dict(zip(colunas, linha)) for linha in dados]
     return jsonify(registros_formatados)
 
+# Relatório comparativo bipagem x carga
 @app.route('/relatorio_diferencas', methods=['GET'])
 def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Pega quantas vezes cada código foi bipado
     cur.execute("""
         SELECT codigo_qr, COUNT(*) AS bipado
         FROM registros_qr
@@ -127,25 +158,20 @@ def relatorio_diferencas():
     bipados = cur.fetchall()
     bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Pega a lista de carga
     cur.execute("""
         SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
         FROM lista_de_carga
         ORDER BY obra, cod_insumo
     """)
     lista = cur.fetchall()
-    relatorio = []
 
-    # Distribui proporcionalmente
+    relatorio = []
     for linha in lista:
         cod_insumo, produto, uhs, obra, cargas, total, pav = linha
-        total = int(total)  # garante que seja número
-
+        total = int(total)
         bipado_disponivel = bipados_dict.get(cod_insumo, 0)
         atendido = min(bipado_disponivel, total)
         faltando = total - atendido
-
-        # Atualiza o valor restante disponível
         bipados_dict[cod_insumo] = bipado_disponivel - atendido
 
         relatorio.append({
@@ -160,9 +186,7 @@ def relatorio_diferencas():
 
     cur.close()
     conn.close()
-
     return jsonify(relatorio)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
