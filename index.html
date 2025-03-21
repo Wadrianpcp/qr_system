@@ -76,6 +76,7 @@
 
     <button onclick="irParaRegistros()">Ver Registros</button>
     <button onclick="irParaUpload()">Importar Lista de Carga</button>
+    <button onclick="irParaListaCarga()">Ver Lista de Carga</button>
   </div>
 
   <div id="mensagem"></div>
@@ -127,6 +128,10 @@
 
     function irParaUpload() {
       window.location.href = "/importar";
+    }
+
+    function irParaListaCarga() {
+      window.location.href = "/lista_carga";
     }
   </script>
 </body>
