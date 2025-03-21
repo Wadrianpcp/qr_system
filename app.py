@@ -118,7 +118,7 @@ def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Dados bipados
+    # Pega quantas vezes cada código foi bipado
     cur.execute("""
         SELECT codigo_qr, COUNT(*) AS bipado
         FROM registros_qr
@@ -127,39 +127,41 @@ def relatorio_diferencas():
     bipados = cur.fetchall()
     bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Agrupar lista de carga por cod_insumo SOMENTE onde há números válidos
+    # Pega a lista de carga
     cur.execute("""
-        SELECT cod_insumo, produto, obra,
-               SUM(CAST(cargas AS INTEGER)) AS cargas,
-               SUM(CAST(total AS INTEGER)) AS total,
-               pav
+        SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
         FROM lista_de_carga
-        WHERE cargas ~ '^[0-9]+$' AND total ~ '^[0-9]+$'
-        GROUP BY cod_insumo, produto, obra, pav
+        ORDER BY obra, cod_insumo
     """)
     lista = cur.fetchall()
-
     relatorio = []
-    for item in lista:
-        cod_insumo, produto, obra, cargas, total, pav = item
-        bipado = bipados_dict.get(cod_insumo, 0)
-        faltando = total - bipado
+
+    # Distribui proporcionalmente
+    for linha in lista:
+        cod_insumo, produto, uhs, obra, cargas, total, pav = linha
+        total = int(total)  # garante que seja número
+
+        bipado_disponivel = bipados_dict.get(cod_insumo, 0)
+        atendido = min(bipado_disponivel, total)
+        faltando = total - atendido
+
+        # Atualiza o valor restante disponível
+        bipados_dict[cod_insumo] = bipado_disponivel - atendido
+
         relatorio.append({
             "cod_insumo": cod_insumo,
             "produto": produto,
             "obra": obra,
             "cargas": cargas,
             "total_necessario": total,
-            "bipado": bipado,
+            "bipado": atendido,
             "faltando": faltando
         })
 
     cur.close()
     conn.close()
 
-
     return jsonify(relatorio)
-
 
 
 if __name__ == '__main__':
