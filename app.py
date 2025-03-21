@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_file
 import psycopg2
+import pandas as pd
 
 app = Flask(__name__)
 
@@ -19,6 +20,11 @@ def index():
 @app.route('/registros')
 def registros():
     return send_file('registros.html')
+
+# Página para importar lista de carga
+@app.route('/importar')
+def importar_lista():
+    return send_file('upload.html')
 
 # Rota para registrar um QR Code no banco
 @app.route('/registrar_qr', methods=['POST'])
@@ -58,6 +64,45 @@ def listar_qr():
     ]
 
     return jsonify(registros_formatados)
+
+# Rota para importar planilha Excel da lista de carga
+@app.route('/upload_lista_carga', methods=['POST'])
+def upload_lista_carga():
+    if 'arquivo' not in request.files:
+        return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
+
+    arquivo = request.files['arquivo']
+
+    if arquivo.filename == '':
+        return jsonify({'erro': 'Nome de arquivo vazio'}), 400
+
+    try:
+        df = pd.read_excel(arquivo)
+
+        colunas_esperadas = ["COD INSUMO", "PRODUTO", "UHS", "OBRA", "CARGAS", "TOTAL", "PAV"]
+        if not all(col in df.columns for col in colunas_esperadas):
+            return jsonify({'erro': 'As colunas do Excel não correspondem às esperadas.'}), 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        for _, row in df.iterrows():
+            cur.execute("""
+                INSERT INTO lista_de_carga (cod_insumo, produto, uhs, obra, cargas, total, pav)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                row["COD INSUMO"], row["PRODUTO"], row["UHS"], row["OBRA"],
+                row["CARGAS"], row["TOTAL"], row["PAV"]
+            ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({'mensagem': 'Lista de carga importada com sucesso.'}), 200
+
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
