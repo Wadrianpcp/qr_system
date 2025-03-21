@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
-  <title>Relatório de Atendimento da Carga</title>
+  <title>Relatório de Carga x Bipagem</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -16,76 +16,78 @@
     }
     th, td {
       border: 1px solid #ccc;
-      padding: 10px;
+      padding: 8px;
       text-align: center;
     }
     th {
       background-color: #f0f0f0;
     }
-    .completo {
+    .faltando-zero {
       background-color: #d4edda;
     }
-    .parcial {
-      background-color: #fff3cd;
-    }
-    .faltando {
+    .faltando-positivo {
       background-color: #f8d7da;
     }
     #btn-voltar {
       margin-top: 20px;
       padding: 10px 20px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
   <h1>Relatório de Atendimento da Carga</h1>
+
   <table>
     <thead>
       <tr>
-        <th>Código do Insumo</th>
-        <th>Produto</th>
-        <th>Total Solicitado</th>
-        <th>Quantidade Bipado</th>
-        <th>Status</th>
+        <th>COD INSUMO</th>
+        <th>PRODUTO</th>
+        <th>OBRA</th>
+        <th>CARGAS</th>
+        <th>TOTAL NECESSÁRIO</th>
+        <th>BIPADO</th>
+        <th>FALTANDO</th>
       </tr>
     </thead>
     <tbody id="tabelaRelatorio">
-      <tr><td colspan="5">Carregando dados...</td></tr>
+      <tr><td colspan="7">Carregando dados...</td></tr>
     </tbody>
   </table>
+
   <button id="btn-voltar" onclick="window.location.href='/'">Voltar</button>
 
   <script>
-    fetch('/relatorio_carga')
+    fetch('/relatorio_diferencas')
       .then(res => res.json())
       .then(data => {
         const tabela = document.getElementById('tabelaRelatorio');
         tabela.innerHTML = '';
 
         if (data.length === 0) {
-          tabela.innerHTML = '<tr><td colspan="5">Nenhum dado encontrado.</td></tr>';
+          tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
           return;
         }
 
         data.forEach(item => {
-          let statusClass = '';
-          if (item.status === 'COMPLETO') statusClass = 'completo';
-          else if (item.status === 'PARCIAL') statusClass = 'parcial';
-          else statusClass = 'faltando';
+          const row = document.createElement('tr');
 
-          tabela.innerHTML += `
-            <tr class="${statusClass}">
-              <td>${item.cod_insumo}</td>
-              <td>${item.produto}</td>
-              <td>${item.total}</td>
-              <td>${item.quantidade_bipada}</td>
-              <td>${item.status}</td>
-            </tr>
+          row.innerHTML = `
+            <td>${item.cod_insumo}</td>
+            <td>${item.produto}</td>
+            <td>${item.obra}</td>
+            <td>${item.cargas}</td>
+            <td>${item.total_necessario}</td>
+            <td>${item.bipado}</td>
+            <td>${item.faltando}</td>
           `;
+
+          row.className = item.faltando === 0 ? 'faltando-zero' : 'faltando-positivo';
+          tabela.appendChild(row);
         });
       })
       .catch(() => {
-        document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="5">Erro ao carregar dados.</td></tr>';
+        document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Erro ao carregar dados.</td></tr>';
       });
   </script>
 </body>
