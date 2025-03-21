@@ -1,3 +1,4 @@
-web: gunicorn qr_system.qr_system.app:app
+web: gunicorn app:app
+
 
  
