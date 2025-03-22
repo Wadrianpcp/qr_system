@@ -3,67 +3,93 @@
 <head>
   <meta charset="UTF-8">
   <title>Lista de Carga</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      font-family: 'Roboto', sans-serif;
-      margin: 0;
-      padding: 20px;
-      background-color: #f9f9f9;
+      font-family: Arial, sans-serif;
+      margin: 10px;
+      padding: 0;
       text-align: center;
     }
 
     h1 {
-      color: #333;
       margin-bottom: 20px;
+    }
+
+    #filtros {
+      margin-bottom: 20px;
+    }
+
+    select {
+      padding: 8px;
+      margin: 0 5px;
+      font-size: 14px;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 10px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      overflow-x: auto;
     }
 
     th, td {
       border: 1px solid #ccc;
-      padding: 10px;
-      background-color: white;
+      padding: 8px;
       text-align: center;
       font-size: 14px;
     }
 
     th {
-      background-color: #e0e0e0;
-      position: sticky;
-      top: 0;
-      z-index: 1;
+      background-color: #f0f0f0;
+      cursor: pointer;
     }
 
     #btn-voltar {
       margin-top: 20px;
-      padding: 10px 25px;
-      background-color: #1976d2;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: bold;
+      padding: 10px 20px;
     }
 
-    #btn-voltar:hover {
-      background-color: #125ea8;
-    }
+    @media (max-width: 768px) {
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
 
-    #mensagem {
-      font-weight: bold;
-      margin-top: 15px;
-      color: red;
+      thead tr {
+        display: none;
+      }
+
+      tr {
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        padding: 10px;
+      }
+
+      td {
+        text-align: right;
+        position: relative;
+        padding-left: 50%;
+      }
+
+      td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 10px;
+        width: 45%;
+        padding-left: 5px;
+        font-weight: bold;
+        text-align: left;
+      }
     }
   </style>
 </head>
 <body>
   <h1>Lista de Carga</h1>
+
+  <div id="filtros">
+    <select id="filtroObra"><option value="">Todas as Obras</option></select>
+    <select id="filtroProduto"><option value="">Todos os Produtos</option></select>
+  </div>
 
   <table>
     <thead>
@@ -74,44 +100,110 @@
     </tbody>
   </table>
 
-  <div id="mensagem"></div>
-
-  <button id="btn-voltar" onclick="window.location.href='/'">Home</button>
+  <button id="btn-voltar" onclick="window.location.href='/'">Voltar</button>
 
   <script>
+    let dadosOriginal = [];
+    let ordemAtual = { coluna: '', asc: true };
+
     fetch('/listar_carga')
       .then(res => res.json())
       .then(data => {
-        const cabecalho = document.getElementById('cabecalhoTabela');
-        const corpo = document.getElementById('corpoTabela');
-        const mensagem = document.getElementById('mensagem');
-
-        corpo.innerHTML = '';
-        mensagem.textContent = '';
-
-        if (data.length === 0) {
-          corpo.innerHTML = '<tr><td colspan="10">Nenhum dado encontrado</td></tr>';
-          return;
-        }
-
-        // Cabeçalho dinâmico
-        Object.keys(data[0]).forEach(col => {
-          cabecalho.innerHTML += `<th>${col.toUpperCase()}</th>`;
-        });
-
-        // Linhas da tabela
-        data.forEach(row => {
-          let linha = '<tr>';
-          for (let col in row) {
-            linha += `<td>${row[col]}</td>`;
-          }
-          linha += '</tr>';
-          corpo.innerHTML += linha;
-        });
+        dadosOriginal = data;
+        montarCabecalho(data);
+        preencherFiltros(data);
+        renderizarTabela(data);
       })
       .catch(() => {
         document.getElementById('corpoTabela').innerHTML = '<tr><td colspan="10">Erro ao carregar dados.</td></tr>';
       });
+
+    function montarCabecalho(data) {
+      const cabecalho = document.getElementById('cabecalhoTabela');
+      cabecalho.innerHTML = '';
+
+      if (data.length === 0) return;
+
+      Object.keys(data[0]).forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col;
+        th.onclick = () => ordenarPor(col);
+        cabecalho.appendChild(th);
+      });
+    }
+
+    function preencherFiltros(data) {
+      const obras = [...new Set(data.map(d => d.obra))];
+      const produtos = [...new Set(data.map(d => d.produto))];
+
+      const filtroObra = document.getElementById('filtroObra');
+      const filtroProduto = document.getElementById('filtroProduto');
+
+      obras.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o;
+        opt.textContent = o;
+        filtroObra.appendChild(opt);
+      });
+
+      produtos.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        filtroProduto.appendChild(opt);
+      });
+
+      filtroObra.addEventListener('change', aplicarFiltros);
+      filtroProduto.addEventListener('change', aplicarFiltros);
+    }
+
+    function aplicarFiltros() {
+      const obra = document.getElementById('filtroObra').value;
+      const produto = document.getElementById('filtroProduto').value;
+
+      const filtrado = dadosOriginal.filter(row =>
+        (!obra || row.obra === obra) &&
+        (!produto || row.produto === produto)
+      );
+
+      renderizarTabela(filtrado);
+    }
+
+    function ordenarPor(coluna) {
+      if (ordemAtual.coluna === coluna) {
+        ordemAtual.asc = !ordemAtual.asc;
+      } else {
+        ordemAtual.coluna = coluna;
+        ordemAtual.asc = true;
+      }
+
+      dadosOriginal.sort((a, b) => {
+        if (a[coluna] < b[coluna]) return ordemAtual.asc ? -1 : 1;
+        if (a[coluna] > b[coluna]) return ordemAtual.asc ? 1 : -1;
+        return 0;
+      });
+
+      aplicarFiltros();
+    }
+
+    function renderizarTabela(data) {
+      const corpo = document.getElementById('corpoTabela');
+      corpo.innerHTML = '';
+
+      if (data.length === 0) {
+        corpo.innerHTML = '<tr><td colspan="10">Nenhum dado encontrado</td></tr>';
+        return;
+      }
+
+      data.forEach(row => {
+        let linha = '<tr>';
+        for (let col in row) {
+          linha += `<td data-label="${col}">${row[col]}</td>`;
+        }
+        linha += '</tr>';
+        corpo.innerHTML += linha;
+      });
+    }
   </script>
 </body>
 </html>
