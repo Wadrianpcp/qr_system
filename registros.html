@@ -17,31 +17,14 @@
     }
 
     .top-bar {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 10px;
       margin-bottom: 20px;
     }
 
-    #filtros input {
+    select {
       padding: 8px;
+      margin: 0 10px;
       font-size: 14px;
       width: 200px;
-    }
-
-    button {
-      padding: 8px 16px;
-      background-color: #1976d2;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background-color: #125ea8;
     }
 
     table {
@@ -59,6 +42,14 @@
 
     th {
       background-color: #e0e0e0;
+    }
+
+    button {
+      padding: 6px 12px;
+      background-color: #d9534f;
+      color: white;
+      border: none;
+      border-radius: 4px;
       cursor: pointer;
     }
 
@@ -74,103 +65,109 @@
     .mensagem.erro {
       color: red;
     }
+
+    #voltar {
+      margin-bottom: 20px;
+      background-color: #0275d8;
+    }
   </style>
 </head>
 <body>
   <h1>Registros de QR Codes</h1>
 
+  <button id="voltar" onclick="window.location.href='/'">Voltar</button>
+
   <div class="top-bar">
-    <button onclick="window.location.href='/'">Voltar para Home</button>
-    <input type="text" id="filtroUsuario" placeholder="Filtrar por Usuário">
-    <input type="text" id="filtroQR" placeholder="Filtrar por QR Code">
-    <input type="text" id="filtroStatus" placeholder="Filtrar por Status">
-    <input type="text" id="filtroData" placeholder="Filtrar por Data/Hora">
+    <select id="filtroQR">
+      <option value="">Filtrar por Código QR</option>
+    </select>
+    <select id="filtroUsuario">
+      <option value="">Filtrar por Usuário</option>
+    </select>
   </div>
 
   <div id="mensagem" class="mensagem"></div>
 
-  <table id="tabela">
+  <table>
     <thead>
       <tr>
-        <th onclick="ordenarPor('id')">ID</th>
-        <th onclick="ordenarPor('codigo_qr')">Código QR</th>
-        <th onclick="ordenarPor('data_hora')">Data/Hora</th>
-        <th onclick="ordenarPor('usuario')">Usuário</th>
-        <th onclick="ordenarPor('status')">Status</th>
+        <th>ID</th>
+        <th>Código QR</th>
+        <th>Usuário</th>
         <th>Ação</th>
       </tr>
     </thead>
     <tbody id="tabelaRegistros">
-      <tr><td colspan="6">Carregando...</td></tr>
+      <tr><td colspan="4">Carregando...</td></tr>
     </tbody>
   </table>
 
   <script>
-    let dados = [];
-    let ordemAtual = { coluna: '', asc: true };
+    let registros = [];
 
     function carregarRegistros() {
       fetch('/listar_qr')
         .then(res => res.json())
         .then(data => {
-          dados = data;
+          registros = data;
+          popularFiltros(data);
           renderizarTabela();
         })
         .catch(() => {
-          document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='6'>Erro ao carregar dados.</td></tr>";
+          document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='4'>Erro ao carregar dados.</td></tr>";
         });
     }
 
-    function renderizarTabela() {
-      const tabela = document.getElementById('tabelaRegistros');
-      const filtroUsuario = document.getElementById('filtroUsuario').value.toLowerCase();
-      const filtroQR = document.getElementById('filtroQR').value.toLowerCase();
-      const filtroStatus = document.getElementById('filtroStatus').value.toLowerCase();
-      const filtroData = document.getElementById('filtroData').value.toLowerCase();
+    function popularFiltros(data) {
+      const usuarios = [...new Set(data.map(r => r.usuario))];
+      const codigos = [...new Set(data.map(r => r.codigo_qr))];
 
-      const filtrado = dados.filter(reg =>
-        reg.usuario.toLowerCase().includes(filtroUsuario) &&
-        reg.codigo_qr.toLowerCase().includes(filtroQR) &&
-        reg.status.toLowerCase().includes(filtroStatus) &&
-        new Date(reg.data_hora).toLocaleString('pt-BR').toLowerCase().includes(filtroData)
-      );
+      const selUsuario = document.getElementById('filtroUsuario');
+      const selQR = document.getElementById('filtroQR');
 
-      tabela.innerHTML = "";
+      usuarios.forEach(user => {
+        const opt = document.createElement('option');
+        opt.value = user;
+        opt.textContent = user;
+        selUsuario.appendChild(opt);
+      });
 
-      if (filtrado.length === 0) {
-        tabela.innerHTML = "<tr><td colspan='6'>Nenhum registro encontrado.</td></tr>";
-        return;
-      }
-
-      filtrado.forEach(registro => {
-        const row = `
-          <tr>
-            <td>${registro.id}</td>
-            <td>${registro.codigo_qr}</td>
-            <td>${new Date(registro.data_hora).toLocaleString('pt-BR')}</td>
-            <td>${registro.usuario}</td>
-            <td>${registro.status}</td>
-            <td><button onclick="excluirRegistro(${registro.id})">Excluir</button></td>
-          </tr>`;
-        tabela.innerHTML += row;
+      codigos.forEach(cod => {
+        const opt = document.createElement('option');
+        opt.value = cod;
+        opt.textContent = cod;
+        selQR.appendChild(opt);
       });
     }
 
-    function ordenarPor(coluna) {
-      if (ordemAtual.coluna === coluna) {
-        ordemAtual.asc = !ordemAtual.asc;
-      } else {
-        ordemAtual.coluna = coluna;
-        ordemAtual.asc = true;
+    function renderizarTabela() {
+      const filtroUsuario = document.getElementById('filtroUsuario').value;
+      const filtroQR = document.getElementById('filtroQR').value;
+
+      const tabela = document.getElementById('tabelaRegistros');
+      tabela.innerHTML = "";
+
+      const filtrado = registros.filter(r =>
+        (!filtroUsuario || r.usuario === filtroUsuario) &&
+        (!filtroQR || r.codigo_qr === filtroQR)
+      );
+
+      if (filtrado.length === 0) {
+        tabela.innerHTML = "<tr><td colspan='4'>Nenhum registro encontrado.</td></tr>";
+        return;
       }
 
-      dados.sort((a, b) => {
-        if (a[coluna] < b[coluna]) return ordemAtual.asc ? -1 : 1;
-        if (a[coluna] > b[coluna]) return ordemAtual.asc ? 1 : -1;
-        return 0;
+      filtrado.forEach(r => {
+        const linha = `
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.codigo_qr}</td>
+            <td>${r.usuario}</td>
+            <td><button onclick="excluirRegistro(${r.id})">Excluir</button></td>
+          </tr>
+        `;
+        tabela.innerHTML += linha;
       });
-
-      renderizarTabela();
     }
 
     function excluirRegistro(id) {
@@ -202,10 +199,8 @@
       el.className = "mensagem " + (sucesso ? "sucesso" : "erro");
     }
 
-    document.getElementById('filtroUsuario').addEventListener('input', renderizarTabela);
-    document.getElementById('filtroQR').addEventListener('input', renderizarTabela);
-    document.getElementById('filtroStatus').addEventListener('input', renderizarTabela);
-    document.getElementById('filtroData').addEventListener('input', renderizarTabela);
+    document.getElementById('filtroUsuario').addEventListener('change', renderizarTabela);
+    document.getElementById('filtroQR').addEventListener('change', renderizarTabela);
 
     window.onload = carregarRegistros;
   </script>
