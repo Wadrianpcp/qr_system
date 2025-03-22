@@ -7,44 +7,43 @@
   <style>
     body {
       font-family: 'Roboto', sans-serif;
-      background-color: #f9f9f9;
-      padding: 20px;
       text-align: center;
+      margin: 20px;
+      background-color: #f9f9f9;
     }
-
     h1 {
       color: #333;
     }
-
-    #filtros {
-      margin: 20px 0;
+    .mensagem {
+      margin: 15px 0;
+      font-weight: bold;
     }
-
-    #filtros input {
-      padding: 8px;
-      margin: 0 10px;
-      font-size: 14px;
-      width: 200px;
+    .mensagem.sucesso {
+      color: green;
     }
-
+    .mensagem.erro {
+      color: red;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-top: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-
     th, td {
-      padding: 10px;
       border: 1px solid #ccc;
-      background-color: white;
+      padding: 10px;
+      text-align: center;
     }
-
     th {
       background-color: #e0e0e0;
       cursor: pointer;
     }
-
+    input[type="text"] {
+      padding: 8px;
+      margin-bottom: 10px;
+      width: 300px;
+    }
     button {
       padding: 6px 12px;
       background-color: #d9534f;
@@ -53,29 +52,15 @@
       border-radius: 4px;
       cursor: pointer;
     }
-
-    .mensagem {
-      margin-top: 15px;
-      font-weight: bold;
-    }
-
-    .mensagem.sucesso {
-      color: green;
-    }
-
-    .mensagem.erro {
-      color: red;
+    button:hover {
+      background-color: #c9302c;
     }
   </style>
 </head>
 <body>
   <h1>Registros de QR Codes</h1>
 
-  <div id="filtros">
-    <input type="text" id="filtroUsuario" placeholder="Filtrar por Usuário">
-    <input type="text" id="filtroQR" placeholder="Filtrar por QR Code">
-    <input type="text" id="filtroStatus" placeholder="Filtrar por Status">
-  </div>
+  <input type="text" id="filtroInput" placeholder="Filtrar por código, usuário ou status..." />
 
   <div id="mensagem" class="mensagem"></div>
 
@@ -97,11 +82,12 @@
 
   <script>
     let dados = [];
-    let ordemAtual = { coluna: '', asc: true };
+    let ordemAsc = true;
+    let campoOrdenacao = '';
 
     function carregarRegistros() {
       fetch('/listar_qr')
-        .then(res => res.json())
+        .then(response => response.json())
         .then(data => {
           dados = data;
           renderizarTabela();
@@ -111,50 +97,52 @@
         });
     }
 
+    function formatarDataBrasileira(dataUTC) {
+      const data = new Date(dataUTC);
+      return data.toLocaleString('pt-BR');
+    }
+
     function renderizarTabela() {
       const tabela = document.getElementById('tabelaRegistros');
-      const filtroUsuario = document.getElementById('filtroUsuario').value.toLowerCase();
-      const filtroQR = document.getElementById('filtroQR').value.toLowerCase();
-      const filtroStatus = document.getElementById('filtroStatus').value.toLowerCase();
-
-      const filtrado = dados.filter(reg =>
-        reg.usuario.toLowerCase().includes(filtroUsuario) &&
-        reg.codigo_qr.toLowerCase().includes(filtroQR) &&
-        reg.status.toLowerCase().includes(filtroStatus)
-      );
-
+      const filtro = document.getElementById('filtroInput').value.toLowerCase();
       tabela.innerHTML = "";
 
-      if (filtrado.length === 0) {
+      const filtrados = dados.filter(reg =>
+        reg.codigo_qr.toLowerCase().includes(filtro) ||
+        reg.usuario.toLowerCase().includes(filtro) ||
+        reg.status.toLowerCase().includes(filtro)
+      );
+
+      if (filtrados.length === 0) {
         tabela.innerHTML = "<tr><td colspan='6'>Nenhum registro encontrado.</td></tr>";
         return;
       }
 
-      filtrado.forEach(registro => {
+      filtrados.forEach(reg => {
         const row = `
           <tr>
-            <td>${registro.id}</td>
-            <td>${registro.codigo_qr}</td>
-            <td>${new Date(registro.data_hora).toLocaleString()}</td>
-            <td>${registro.usuario}</td>
-            <td>${registro.status}</td>
-            <td><button onclick="excluirRegistro(${registro.id})">Excluir</button></td>
+            <td>${reg.id}</td>
+            <td>${reg.codigo_qr}</td>
+            <td>${formatarDataBrasileira(reg.data_hora)}</td>
+            <td>${reg.usuario}</td>
+            <td>${reg.status}</td>
+            <td><button onclick="excluirRegistro(${reg.id})">Excluir</button></td>
           </tr>`;
         tabela.innerHTML += row;
       });
     }
 
-    function ordenarPor(coluna) {
-      if (ordemAtual.coluna === coluna) {
-        ordemAtual.asc = !ordemAtual.asc;
+    function ordenarPor(campo) {
+      if (campoOrdenacao === campo) {
+        ordemAsc = !ordemAsc;
       } else {
-        ordemAtual.coluna = coluna;
-        ordemAtual.asc = true;
+        campoOrdenacao = campo;
+        ordemAsc = true;
       }
 
       dados.sort((a, b) => {
-        if (a[coluna] < b[coluna]) return ordemAtual.asc ? -1 : 1;
-        if (a[coluna] > b[coluna]) return ordemAtual.asc ? 1 : -1;
+        if (a[campo] < b[campo]) return ordemAsc ? -1 : 1;
+        if (a[campo] > b[campo]) return ordemAsc ? 1 : -1;
         return 0;
       });
 
@@ -168,20 +156,23 @@
         return;
       }
 
-      fetch(`/excluir_qr/${id}`, { method: 'DELETE' })
-        .then(res => res.json())
-        .then(res => {
-          if (res.sucesso) {
-            mostrarMensagem("Registro excluído com sucesso!", true);
-            carregarRegistros();
-            new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg').play();
-          } else {
-            mostrarMensagem("Erro ao excluir o registro.", false);
-          }
-        })
-        .catch(() => {
-          mostrarMensagem("Erro ao comunicar com o servidor.", false);
-        });
+      fetch(`/excluir_qr/${id}`, {
+        method: 'DELETE'
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.sucesso) {
+          mostrarMensagem("Registro excluído com sucesso!", true);
+          carregarRegistros();
+          new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg').play();
+        } else {
+          mostrarMensagem("Erro ao excluir o registro.", false);
+          new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play();
+        }
+      })
+      .catch(() => {
+        mostrarMensagem("Erro ao comunicar com o servidor.", false);
+      });
     }
 
     function mostrarMensagem(msg, sucesso) {
@@ -190,9 +181,7 @@
       el.className = "mensagem " + (sucesso ? "sucesso" : "erro");
     }
 
-    document.getElementById('filtroUsuario').addEventListener('input', renderizarTabela);
-    document.getElementById('filtroQR').addEventListener('input', renderizarTabela);
-    document.getElementById('filtroStatus').addEventListener('input', renderizarTabela);
+    document.getElementById("filtroInput").addEventListener("input", renderizarTabela);
 
     window.onload = carregarRegistros;
   </script>
