@@ -1,4 +1,6 @@
 from flask import Flask, request, jsonify, send_file
+from datetime import datetime
+import pytz
 import psycopg2
 import pandas as pd
 
@@ -29,7 +31,6 @@ def lista_carga():
 def relatorio():
     return send_file('relatorio.html')
 
-# REGISTRAR QR
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
     data = request.json
@@ -39,10 +40,13 @@ def registrar_qr():
     if not codigo_qr or not usuario:
         return jsonify({"erro": "Código QR e usuário são obrigatórios"}), 400
 
+    fuso_brasilia = pytz.timezone('America/Sao_Paulo')
+    data_hora = datetime.now(fuso_brasilia).strftime('%Y-%m-%d %H:%M:%S')
+
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("INSERT INTO registros_qr (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
+        cur.execute("INSERT INTO registros_qr (codigo_qr, usuario, data_hora) VALUES (%s, %s, %s)", (codigo_qr, usuario, data_hora))
         conn.commit()
         return jsonify({"mensagem": "QR Code registrado com sucesso!"}), 201
     except Exception as e:
@@ -51,7 +55,6 @@ def registrar_qr():
         cur.close()
         conn.close()
 
-# LISTAR REGISTROS
 @app.route('/listar_qr', methods=['GET'])
 def listar_qr():
     conn = get_db_connection()
@@ -61,32 +64,35 @@ def listar_qr():
     cur.close()
     conn.close()
 
-    registros_formatados = [
-        {"id": r[0], "codigo_qr": r[1], "data_hora": r[2].strftime("%Y-%m-%d %H:%M:%S"), "usuario": r[3], "status": r[4]}
-        for r in registros
-    ]
+    registros_formatados = []
+    for r in registros:
+        dt = r[2]
+        if isinstance(dt, datetime):
+            dt = dt.astimezone(pytz.timezone('America/Sao_Paulo')).strftime('%d/%m/%Y %H:%M:%S')
+        registros_formatados.append({
+            "id": r[0],
+            "codigo_qr": r[1],
+            "data_hora": dt,
+            "usuario": r[3],
+            "status": r[4]
+        })
+
     return jsonify(registros_formatados)
 
-# EXCLUIR REGISTRO COM SENHA
-@app.route('/excluir_qr/<int:id>', methods=['DELETE'])
-def excluir_qr(id):
-    senha = request.args.get('senha')
-    if senha != "@pcp1234":
-        return jsonify({"erro": "Senha incorreta"}), 403
-
+@app.route('/excluir_qr/<int:registro_id>', methods=['DELETE'])
+def excluir_qr(registro_id):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("DELETE FROM registros_qr WHERE id = %s", (id,))
+        cur.execute("DELETE FROM registros_qr WHERE id = %s", (registro_id,))
         conn.commit()
-        return jsonify({"sucesso": True}), 200
+        return jsonify({"sucesso": True})
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
         conn.close()
 
-# UPLOAD LISTA DE CARGA
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
     if 'arquivo' not in request.files:
@@ -111,7 +117,7 @@ def upload_lista_carga():
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (
                 row["COD INSUMO"], row["PRODUTO"], row["UHS"], row["OBRA"],
-                row["CARGAS"], int(row["TOTAL"]), row["PAV"]
+                row["CARGAS"], row["TOTAL"], row["PAV"]
             ))
 
         conn.commit()
@@ -123,7 +129,6 @@ def upload_lista_carga():
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
-# LISTAR LISTA DE CARGA
 @app.route('/listar_carga', methods=['GET'])
 def listar_carga():
     conn = get_db_connection()
@@ -137,7 +142,6 @@ def listar_carga():
     registros_formatados = [dict(zip(colunas, linha)) for linha in dados]
     return jsonify(registros_formatados)
 
-# RELATÓRIO DIFERENÇAS
 @app.route('/relatorio_diferencas', methods=['GET'])
 def relatorio_diferencas():
     conn = get_db_connection()
