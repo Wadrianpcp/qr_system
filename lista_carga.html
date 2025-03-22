@@ -3,33 +3,68 @@
 <head>
   <meta charset="UTF-8">
   <title>Lista de Carga</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
+      font-family: 'Roboto', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f9f9f9;
       text-align: center;
     }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
+      margin-top: 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
+
     th, td {
       border: 1px solid #ccc;
-      padding: 8px;
+      padding: 10px;
+      background-color: white;
       text-align: center;
+      font-size: 14px;
     }
+
     th {
-      background-color: #f0f0f0;
+      background-color: #e0e0e0;
+      position: sticky;
+      top: 0;
+      z-index: 1;
     }
+
     #btn-voltar {
       margin-top: 20px;
-      padding: 10px 20px;
+      padding: 10px 25px;
+      background-color: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #btn-voltar:hover {
+      background-color: #125ea8;
+    }
+
+    #mensagem {
+      font-weight: bold;
+      margin-top: 15px;
+      color: red;
     }
   </style>
 </head>
 <body>
   <h1>Lista de Carga</h1>
+
   <table>
     <thead>
       <tr id="cabecalhoTabela"></tr>
@@ -38,7 +73,10 @@
       <tr><td colspan="10">Carregando dados...</td></tr>
     </tbody>
   </table>
-  <button id="btn-voltar" onclick="window.location.href='/'">Voltar</button>
+
+  <div id="mensagem"></div>
+
+  <button id="btn-voltar" onclick="window.location.href='/'">Home</button>
 
   <script>
     fetch('/listar_carga')
@@ -46,20 +84,22 @@
       .then(data => {
         const cabecalho = document.getElementById('cabecalhoTabela');
         const corpo = document.getElementById('corpoTabela');
+        const mensagem = document.getElementById('mensagem');
 
         corpo.innerHTML = '';
+        mensagem.textContent = '';
 
         if (data.length === 0) {
           corpo.innerHTML = '<tr><td colspan="10">Nenhum dado encontrado</td></tr>';
           return;
         }
 
-        // Criar cabeçalho dinâmico
+        // Cabeçalho dinâmico
         Object.keys(data[0]).forEach(col => {
-          cabecalho.innerHTML += `<th>${col}</th>`;
+          cabecalho.innerHTML += `<th>${col.toUpperCase()}</th>`;
         });
 
-        // Criar linhas da tabela
+        // Linhas da tabela
         data.forEach(row => {
           let linha = '<tr>';
           for (let col in row) {
