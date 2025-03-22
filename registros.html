@@ -53,6 +53,11 @@
       cursor: pointer;
     }
 
+    #voltar {
+      margin-bottom: 20px;
+      background-color: #0275d8;
+    }
+
     .mensagem {
       margin-top: 15px;
       font-weight: bold;
@@ -66,9 +71,13 @@
       color: red;
     }
 
-    #voltar {
-      margin-bottom: 20px;
-      background-color: #0275d8;
+    #leitorQR {
+      margin-top: 20px;
+      display: none;
+    }
+
+    #leitorQR video {
+      width: 100% !important;
     }
   </style>
 </head>
@@ -84,9 +93,12 @@
     <select id="filtroUsuario">
       <option value="">Filtrar por Usuário</option>
     </select>
+    <button onclick="abrirLeitorQR()">📷 Usar câmera</button>
   </div>
 
   <div id="mensagem" class="mensagem"></div>
+
+  <div id="leitorQR"></div>
 
   <table>
     <thead>
@@ -102,8 +114,12 @@
     </tbody>
   </table>
 
+  <!-- Bibliotecas -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
   <script>
     let registros = [];
+    let scannerAtivo = false;
 
     function carregarRegistros() {
       fetch('/listar_qr')
@@ -125,6 +141,7 @@
       const selUsuario = document.getElementById('filtroUsuario');
       const selQR = document.getElementById('filtroQR');
 
+      selUsuario.innerHTML = '<option value="">Filtrar por Usuário</option>';
       usuarios.forEach(user => {
         const opt = document.createElement('option');
         opt.value = user;
@@ -132,6 +149,7 @@
         selUsuario.appendChild(opt);
       });
 
+      selQR.innerHTML = '<option value="">Filtrar por Código QR</option>';
       codigos.forEach(cod => {
         const opt = document.createElement('option');
         opt.value = cod;
@@ -201,6 +219,31 @@
 
     document.getElementById('filtroUsuario').addEventListener('change', renderizarTabela);
     document.getElementById('filtroQR').addEventListener('change', renderizarTabela);
+
+    function abrirLeitorQR() {
+      const container = document.getElementById("leitorQR");
+      container.innerHTML = "";
+      if (scannerAtivo) return;
+
+      container.style.display = "block";
+      const html5QrCode = new Html5Qrcode("leitorQR");
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        qrCodeMessage => {
+          document.getElementById("filtroQR").value = qrCodeMessage;
+          renderizarTabela();
+          html5QrCode.stop();
+          container.style.display = "none";
+          scannerAtivo = false;
+        }
+      ).then(() => {
+        scannerAtivo = true;
+      }).catch(err => {
+        container.innerHTML = "<p style='color:red'>Erro ao iniciar câmera: " + err + "</p>";
+      });
+    }
 
     window.onload = carregarRegistros;
   </script>
