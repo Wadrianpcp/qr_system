@@ -16,15 +16,32 @@
       color: #333;
     }
 
-    #filtros {
-      margin: 20px 0;
+    .top-bar {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
     }
 
     #filtros input {
       padding: 8px;
-      margin: 0 10px;
       font-size: 14px;
       width: 200px;
+    }
+
+    button {
+      padding: 8px 16px;
+      background-color: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #125ea8;
     }
 
     table {
@@ -45,15 +62,6 @@
       cursor: pointer;
     }
 
-    button {
-      padding: 6px 12px;
-      background-color: #d9534f;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
     .mensagem {
       margin-top: 15px;
       font-weight: bold;
@@ -71,10 +79,12 @@
 <body>
   <h1>Registros de QR Codes</h1>
 
-  <div id="filtros">
+  <div class="top-bar">
+    <button onclick="window.location.href='/'">Voltar para Home</button>
     <input type="text" id="filtroUsuario" placeholder="Filtrar por Usuário">
     <input type="text" id="filtroQR" placeholder="Filtrar por QR Code">
     <input type="text" id="filtroStatus" placeholder="Filtrar por Status">
+    <input type="text" id="filtroData" placeholder="Filtrar por Data/Hora">
   </div>
 
   <div id="mensagem" class="mensagem"></div>
@@ -116,11 +126,13 @@
       const filtroUsuario = document.getElementById('filtroUsuario').value.toLowerCase();
       const filtroQR = document.getElementById('filtroQR').value.toLowerCase();
       const filtroStatus = document.getElementById('filtroStatus').value.toLowerCase();
+      const filtroData = document.getElementById('filtroData').value.toLowerCase();
 
       const filtrado = dados.filter(reg =>
         reg.usuario.toLowerCase().includes(filtroUsuario) &&
         reg.codigo_qr.toLowerCase().includes(filtroQR) &&
-        reg.status.toLowerCase().includes(filtroStatus)
+        reg.status.toLowerCase().includes(filtroStatus) &&
+        new Date(reg.data_hora).toLocaleString('pt-BR').toLowerCase().includes(filtroData)
       );
 
       tabela.innerHTML = "";
@@ -135,7 +147,7 @@
           <tr>
             <td>${registro.id}</td>
             <td>${registro.codigo_qr}</td>
-            <td>${new Date(registro.data_hora).toLocaleString()}</td>
+            <td>${new Date(registro.data_hora).toLocaleString('pt-BR')}</td>
             <td>${registro.usuario}</td>
             <td>${registro.status}</td>
             <td><button onclick="excluirRegistro(${registro.id})">Excluir</button></td>
@@ -193,6 +205,7 @@
     document.getElementById('filtroUsuario').addEventListener('input', renderizarTabela);
     document.getElementById('filtroQR').addEventListener('input', renderizarTabela);
     document.getElementById('filtroStatus').addEventListener('input', renderizarTabela);
+    document.getElementById('filtroData').addEventListener('input', renderizarTabela);
 
     window.onload = carregarRegistros;
   </script>
