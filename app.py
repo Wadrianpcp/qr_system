@@ -214,44 +214,59 @@ def relatorio_diferencas():
     cur.close()
     conn.close()
     return jsonify(relatorio)
-
 @app.route('/relatorio_obra_dados')
 def relatorio_obra_dados():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Itens atendidos na carga
+    # Consulta bipagem na FÁBRICA
     cur.execute("""
-        SELECT cod_insumo, produto, obra, COUNT(*) as necessario
-        FROM lista_de_carga lc
-        JOIN registros_qr r ON r.codigo_qr = lc.cod_insumo
-        GROUP BY cod_insumo, produto, obra
+        SELECT codigo_qr, COUNT(*) AS bipado
+        FROM registros_qr
+        GROUP BY codigo_qr
     """)
-    enviados = cur.fetchall()
+    bipados = cur.fetchall()
+    bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Bipagens feitas pela obra
+    # Consulta bipagem na OBRA
     cur.execute("""
-        SELECT codigo_qr, COUNT(*) as recebido
+        SELECT codigo_qr, COUNT(*) AS bipado_obra
         FROM recebimento_obra
         GROUP BY codigo_qr
     """)
     recebidos = cur.fetchall()
     recebidos_dict = {codigo: qtd for codigo, qtd in recebidos}
 
+    # Consulta lista de carga
+    cur.execute("""
+        SELECT cod_insumo, produto, obra, cargas, total
+        FROM lista_de_carga
+        ORDER BY obra, cod_insumo
+    """)
+    lista = cur.fetchall()
+
     relatorio = []
-    for cod_insumo, produto, obra, necessario in enviados:
-        recebido = recebidos_dict.get(cod_insumo, 0)
-        atendido = min(necessario, recebido)
-        faltando = necessario - atendido
-        relatorio.append({
-            "cod_insumo": cod_insumo,
-            "produto": produto,
-            "obra": obra,
-            "estoque": recebido,
-            "necessario": necessario,
-            "atendido": atendido,
-            "faltando": faltando
-        })
+    for linha in lista:
+        cod_insumo, produto, obra, cargas, total = linha
+        total = int(total)
+
+        # Verifica se foi atendido na fábrica
+        bipado_fabrica = bipados_dict.get(cod_insumo, 0)
+        atendido = min(bipado_fabrica, total)
+
+        if atendido > 0:  # Só considera itens enviados da fábrica
+            recebido_obra = recebidos_dict.get(cod_insumo, 0)
+            faltando = atendido - recebido_obra
+
+            relatorio.append({
+                "cod_insumo": cod_insumo,
+                "produto": produto,
+                "obra": obra,
+                "cargas": cargas,
+                "total_necessario": atendido,
+                "bipado": recebido_obra,
+                "faltando": faltando
+            })
 
     cur.close()
     conn.close()
