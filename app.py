@@ -15,7 +15,7 @@ def get_db_connection():
 def index():
     return send_file('index.html')
 
-@app.route('/')
+@app.route('/obra')
 def index():
     return send_file('registros_obra.html')
 
