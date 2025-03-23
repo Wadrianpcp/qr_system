@@ -1,181 +1,129 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Recebimento Obra - QR Code</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>Bipagem na Obra</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Roboto', sans-serif;
-      background-color: #f9f9f9;
+      background-color: #f4f4f4;
       margin: 0;
       padding: 20px;
       text-align: center;
     }
-
-    .container {
-      max-width: 800px;
-      margin: auto;
-    }
-
     h1 {
       color: #333;
     }
-
-    .top-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      justify-content: center;
-      align-items: center;
-      margin-bottom: 20px;
+    #camera-preview {
+      width: 100%;
+      max-width: 400px;
+      margin: 20px auto;
+      border: 2px solid #ccc;
     }
-
-    input[type="text"] {
+    input, button {
       padding: 10px;
       font-size: 16px;
-      width: 200px;
+      margin: 10px 5px;
     }
-
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      background-color: #1976d2;
-      color: white;
-      border: none;
-      cursor: pointer;
-      border-radius: 5px;
-    }
-
-    #mensagem {
-      margin: 10px;
-      font-weight: bold;
-      color: green;
-    }
-
-    #display {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: black;
-      color: limegreen;
-      font-size: 5vw;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-    }
-
-    #historico {
+    #ultimos-registros {
       margin-top: 30px;
+      text-align: left;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
     }
-
-    #historico ul {
+    ul {
       list-style: none;
       padding: 0;
-      max-width: 500px;
-      margin: 0 auto;
     }
-
-    #historico li {
-      background: #eee;
+    li {
+      background-color: #fff;
+      padding: 10px;
+      border: 1px solid #ddd;
       margin-bottom: 5px;
-      padding: 8px;
-      border-radius: 4px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Recebimento na Obra - QR Code</h1>
+  <h1>Bipagem na Obra</h1>
 
-    <div class="top-bar">
-      <input type="text" id="usuario" placeholder="Seu nome" />
-      <input type="text" id="qrInput" placeholder="Escaneie o QR Code" autofocus />
-      <button onclick="window.location.href='/registros_obra'">Ver Registros</button>
-      <button onclick="window.location.href='/relatorio_obra'">Relatório de Obra</button>
-      <button onclick="registrar()">Registrar</button>
-    </div>
+  <input type="text" id="inputQR" placeholder="Escaneie ou digite o QR Code" autofocus>
+  <input type="text" id="inputUsuario" placeholder="Usuário">
+  <button onclick="registrarQR()">Registrar</button>
+  <button onclick="window.location.href='/registros_obra'">Ver Registros da Obra</button>
+  <button onclick="iniciarCamera()">Ativar Câmera</button>
 
-    <div id="mensagem"></div>
-    <div id="display"></div>
+  <video id="camera-preview" playsinline></video>
 
-    <div id="historico">
-      <h3>Últimos 10 QR Codes bipados:</h3>
-      <ul id="listaHistorico"></ul>
-    </div>
+  <div id="ultimos-registros">
+    <h3>Últimos QR Codes Bipados:</h3>
+    <ul id="listaRegistros"></ul>
   </div>
 
-  <audio id="sucesso" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
-  <audio id="erro" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+  <audio id="audio-ok" src="ok.mp3" preload="auto"></audio>
+  <audio id="audio-erro" src="erro.mp3" preload="auto"></audio>
 
+  <script src="https://unpkg.com/@zxing/browser@latest"></script>
   <script>
-    const qrInput = document.getElementById("qrInput");
-    const usuarioInput = document.getElementById("usuario");
-    const listaHistorico = document.getElementById("listaHistorico");
-    const sucesso = document.getElementById("sucesso");
-    const erro = document.getElementById("erro");
+    const inputQR = document.getElementById('inputQR');
+    const inputUsuario = document.getElementById('inputUsuario');
+    const listaRegistros = document.getElementById('listaRegistros');
+    const audioOk = document.getElementById('audio-ok');
+    const audioErro = document.getElementById('audio-erro');
 
-    let historico = JSON.parse(localStorage.getItem("historico_qr_obra")) || [];
+    function registrarQR() {
+      const codigo = inputQR.value.trim();
+      const usuario = inputUsuario.value.trim();
 
-    function atualizarHistorico(qr) {
-      historico.unshift(qr);
-      if (historico.length > 10) historico.pop();
-      localStorage.setItem("historico_qr_obra", JSON.stringify(historico));
-      renderizarHistorico();
-    }
-
-    function renderizarHistorico() {
-      listaHistorico.innerHTML = "";
-      historico.forEach(qr => {
-        const li = document.createElement("li");
-        li.textContent = qr;
-        listaHistorico.appendChild(li);
-      });
-    }
-
-    function registrar() {
-      const codigo_qr = qrInput.value.trim();
-      const usuario = usuarioInput.value.trim();
-      if (!codigo_qr || !usuario) {
-        alert("Preencha o nome e o QR Code!");
+      if (!codigo || !usuario) {
+        alert('Informe o QR Code e o usuário.');
         return;
       }
 
-      fetch("/registrar_qr_obra", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo_qr, usuario })
+      fetch('/registrar_qr_obra', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({codigo_qr: codigo, usuario: usuario})
       })
       .then(res => res.json())
       .then(data => {
         if (data.mensagem) {
-          document.getElementById("mensagem").textContent = data.mensagem;
-          sucesso.play();
-          atualizarHistorico(codigo_qr);
+          audioOk.play();
+          inputQR.value = '';
+          carregarUltimosRegistros();
         } else {
-          erro.play();
-          document.getElementById("mensagem").textContent = data.erro || "Erro ao registrar.";
+          audioErro.play();
+          alert(data.erro || 'Erro ao registrar.');
         }
-      })
-      .catch(() => {
-        erro.play();
-        document.getElementById("mensagem").textContent = "Erro ao comunicar com o servidor.";
       });
-
-      qrInput.value = "";
     }
 
-    qrInput.addEventListener("keypress", function (event) {
-      if (event.key === "Enter") {
-        registrar();
-      }
-    });
+    function carregarUltimosRegistros() {
+      fetch('/listar_qr_obra')
+        .then(res => res.json())
+        .then(dados => {
+          listaRegistros.innerHTML = '';
+          dados.slice(0, 10).forEach(r => {
+            const li = document.createElement('li');
+            li.textContent = `${r.codigo_qr} - ${r.usuario} - ${r.data_hora}`;
+            listaRegistros.appendChild(li);
+          });
+        });
+    }
 
-    window.onload = renderizarHistorico;
+    function iniciarCamera() {
+      const codeReader = new ZXing.BrowserMultiFormatReader();
+      codeReader.decodeFromVideoDevice(null, 'camera-preview', (result, err) => {
+        if (result) {
+          inputQR.value = result.text;
+          registrarQR();
+          codeReader.reset();
+        }
+      });
+    }
+
+    carregarUltimosRegistros();
   </script>
 </body>
 </html>
