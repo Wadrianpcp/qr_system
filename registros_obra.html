@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8" />
-  <title>Registros - Obra</title>
+  <title>Registros de QR Codes (Obra)</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
@@ -86,4 +86,124 @@
     </select>
   </div>
 
-  <div id="mensagem" class="mensagem"></div
+  <div id="mensagem" class="mensagem"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Código QR</th>
+        <th>Data/Hora</th>
+        <th>Usuário</th>
+        <th>Ação</th>
+      </tr>
+    </thead>
+    <tbody id="tabelaRegistros">
+      <tr><td colspan="5">Carregando...</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    let registros = [];
+
+    function carregarRegistros() {
+      fetch('/listar_qr_obra')
+        .then(res => res.json())
+        .then(data => {
+          registros = data;
+          popularFiltros(data);
+          renderizarTabela();
+        })
+        .catch(() => {
+          document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='5'>Erro ao carregar dados.</td></tr>";
+        });
+    }
+
+    function popularFiltros(data) {
+      const usuarios = [...new Set(data.map(r => r.usuario))];
+      const codigos = [...new Set(data.map(r => r.codigo_qr))];
+
+      const selUsuario = document.getElementById('filtroUsuario');
+      const selQR = document.getElementById('filtroQR');
+
+      usuarios.forEach(user => {
+        const opt = document.createElement('option');
+        opt.value = user;
+        opt.textContent = user;
+        selUsuario.appendChild(opt);
+      });
+
+      codigos.forEach(cod => {
+        const opt = document.createElement('option');
+        opt.value = cod;
+        opt.textContent = cod;
+        selQR.appendChild(opt);
+      });
+    }
+
+    function renderizarTabela() {
+      const filtroUsuario = document.getElementById('filtroUsuario').value;
+      const filtroQR = document.getElementById('filtroQR').value;
+      const tabela = document.getElementById('tabelaRegistros');
+      tabela.innerHTML = "";
+
+      const filtrado = registros.filter(r =>
+        (!filtroUsuario || r.usuario === filtroUsuario) &&
+        (!filtroQR || r.codigo_qr === filtroQR)
+      );
+
+      if (filtrado.length === 0) {
+        tabela.innerHTML = "<tr><td colspan='5'>Nenhum registro encontrado.</td></tr>";
+        return;
+      }
+
+      filtrado.forEach(r => {
+        const linha = `
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.codigo_qr}</td>
+            <td>${r.data_hora || ""}</td>
+            <td>${r.usuario}</td>
+            <td><button onclick="excluirRegistro(${r.id})">Excluir</button></td>
+          </tr>
+        `;
+        tabela.innerHTML += linha;
+      });
+    }
+
+    function excluirRegistro(id) {
+      const senha = prompt("Digite a senha para excluir o registro:");
+      if (senha !== "@pcp1234") {
+        mostrarMensagem("Senha incorreta. Ação não autorizada.", false);
+        return;
+      }
+
+      fetch(`/excluir_qr_obra/${id}`, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(res => {
+          if (res.sucesso) {
+            mostrarMensagem("Registro excluído com sucesso!", true);
+            carregarRegistros();
+            new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg').play();
+          } else {
+            mostrarMensagem("Erro ao excluir o registro.", false);
+          }
+        })
+        .catch(() => {
+          mostrarMensagem("Erro ao comunicar com o servidor.", false);
+        });
+    }
+
+    function mostrarMensagem(msg, sucesso) {
+      const el = document.getElementById("mensagem");
+      el.textContent = msg;
+      el.className = "mensagem " + (sucesso ? "sucesso" : "erro");
+    }
+
+    document.getElementById('filtroUsuario').addEventListener('change', renderizarTabela);
+    document.getElementById('filtroQR').addEventListener('change', renderizarTabela);
+
+    window.onload = carregarRegistros;
+  </script>
+</body>
+</html>
