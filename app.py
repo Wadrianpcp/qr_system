@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_file
+import psycopg2
 from datetime import datetime
 import pytz
-import psycopg2
 import pandas as pd
 
 app = Flask(__name__)
@@ -36,19 +36,21 @@ def registrar_qr():
     data = request.json
     codigo_qr = data.get('codigo_qr')
     usuario = data.get('usuario')
+    modo = data.get('modo', 'fabrica')  # padrão
 
     if not codigo_qr or not usuario:
         return jsonify({"erro": "Código QR e usuário são obrigatórios"}), 400
 
-    fuso_brasilia = pytz.timezone('America/Sao_Paulo')
-    data_hora = datetime.now(fuso_brasilia).strftime('%Y-%m-%d %H:%M:%S')
-
     conn = get_db_connection()
     cur = conn.cursor()
+
     try:
-        cur.execute("INSERT INTO registros_qr (codigo_qr, usuario, data_hora) VALUES (%s, %s, %s)", (codigo_qr, usuario, data_hora))
+        if modo == 'obra':
+            cur.execute("INSERT INTO recebimento_obra (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
+        else:
+            cur.execute("INSERT INTO registros_qr (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
         conn.commit()
-        return jsonify({"mensagem": "QR Code registrado com sucesso!"}), 201
+        return jsonify({"mensagem": f"QR Code registrado com sucesso no modo {modo}!"}), 201
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
     finally:
@@ -64,34 +66,31 @@ def listar_qr():
     cur.close()
     conn.close()
 
-    registros_formatados = []
-    for r in registros:
-        dt = r[2]
-        if isinstance(dt, datetime):
-            dt = dt.astimezone(pytz.timezone('America/Sao_Paulo')).strftime('%d/%m/%Y %H:%M:%S')
-        registros_formatados.append({
+    fuso_brasilia = pytz.timezone("America/Sao_Paulo")
+    registros_formatados = [
+        {
             "id": r[0],
             "codigo_qr": r[1],
-            "data_hora": dt,
+            "data_hora": r[2].astimezone(fuso_brasilia).strftime("%d/%m/%Y %H:%M:%S"),
             "usuario": r[3],
             "status": r[4]
-        })
-
+        }
+        for r in registros
+    ]
     return jsonify(registros_formatados)
 
 @app.route('/excluir_qr/<int:registro_id>', methods=['DELETE'])
 def excluir_qr(registro_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
     try:
+        conn = get_db_connection()
+        cur = conn.cursor()
         cur.execute("DELETE FROM registros_qr WHERE id = %s", (registro_id,))
         conn.commit()
-        return jsonify({"sucesso": True})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
         cur.close()
         conn.close()
+        return jsonify({"sucesso": True})
+    except Exception as e:
+        return jsonify({"sucesso": False, "erro": str(e)})
 
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
@@ -166,6 +165,7 @@ def relatorio_diferencas():
     for linha in lista:
         cod_insumo, produto, uhs, obra, cargas, total, pav = linha
         total = int(total)
+
         bipado_disponivel = bipados_dict.get(cod_insumo, 0)
         atendido = min(bipado_disponivel, total)
         faltando = total - atendido
