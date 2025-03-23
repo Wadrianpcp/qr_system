@@ -87,7 +87,7 @@
     let dadosGlobais = [];
 
     function carregarRelatorio() {
-      fetch('/relatorio_obra_final')
+      fetch('/relatorio_obra_dados')
         .then(res => res.json())
         .then(data => {
           dadosGlobais = data;
@@ -105,6 +105,9 @@
 
       const selObra = document.getElementById('filtroObra');
       const selProd = document.getElementById('filtroProduto');
+
+      selObra.innerHTML = '<option value="">Todas</option>';
+      selProd.innerHTML = '<option value="">Todos</option>';
 
       obras.forEach(obra => {
         const opt = document.createElement('option');
