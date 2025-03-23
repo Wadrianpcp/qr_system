@@ -27,17 +27,13 @@ def registros():
 def registros_obra():
     return send_file('registros_obra.html')
 
-@app.route('/importar')
-def importar_lista():
-    return send_file('upload.html')
-
-@app.route('/lista_carga')
-def lista_carga():
-    return send_file('lista_carga.html')
-
 @app.route('/relatorio')
 def relatorio():
     return send_file('relatorio.html')
+
+@app.route('/relatorio_obra')
+def relatorio_obra():
+    return send_file('relatorio_obra.html')
 
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
@@ -239,6 +235,51 @@ def relatorio_diferencas():
             "bipado": atendido,
             "faltando": faltando
         })
+
+    cur.close()
+    conn.close()
+    return jsonify(relatorio)
+
+@app.route('/relatorio_obra_dados', methods=['GET'])
+def relatorio_obra_dados():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT codigo_qr, COUNT(*) AS bipado
+        FROM registros_qr
+        GROUP BY codigo_qr
+    """)
+    bipados = cur.fetchall()
+    bipados_dict = {codigo: qtd for codigo, qtd in bipados}
+
+    cur.execute("""
+        SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
+        FROM lista_de_carga
+        ORDER BY obra, cod_insumo
+    """)
+    lista = cur.fetchall()
+    relatorio = []
+
+    for linha in lista:
+        cod_insumo, produto, uhs, obra, cargas, total, pav = linha
+        total = int(total)
+
+        bipado_disponivel = bipados_dict.get(cod_insumo, 0)
+        atendido = min(bipado_disponivel, total)
+        faltando = total - atendido
+        bipados_dict[cod_insumo] = bipado_disponivel - atendido
+
+        if atendido > 0:
+            relatorio.append({
+                "cod_insumo": cod_insumo,
+                "produto": produto,
+                "obra": obra,
+                "cargas": cargas,
+                "total_necessario": total,
+                "bipado": atendido,
+                "faltando": faltando
+            })
 
     cur.close()
     conn.close()
