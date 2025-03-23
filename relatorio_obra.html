@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
-  <title>Relatório Final da Obra</title>
+  <title>Relatório de Recebimento da Obra</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
@@ -49,7 +49,7 @@
   </style>
 </head>
 <body>
-  <h1>Relatório Final da Obra</h1>
+  <h1>Relatório de Recebimento da Obra</h1>
 
   <div id="filtros">
     <label>Obra:
@@ -72,9 +72,9 @@
         <th>Código</th>
         <th>Produto</th>
         <th>Obra</th>
-        <th>Estoque</th>
-        <th>Necessário</th>
-        <th>Atendido</th>
+        <th>Cargas</th>
+        <th>Total Necessário</th>
+        <th>Bipado</th>
         <th>Faltando</th>
       </tr>
     </thead>
@@ -105,9 +105,6 @@
 
       const selObra = document.getElementById('filtroObra');
       const selProd = document.getElementById('filtroProduto');
-
-      selObra.innerHTML = '<option value="">Todas</option>';
-      selProd.innerHTML = '<option value="">Todos</option>';
 
       obras.forEach(obra => {
         const opt = document.createElement('option');
@@ -149,9 +146,9 @@
           <td>${item.cod_insumo}</td>
           <td>${item.produto}</td>
           <td>${item.obra}</td>
-          <td>${item.estoque}</td>
-          <td>${item.necessario}</td>
-          <td>${item.atendido}</td>
+          <td>${item.cargas}</td>
+          <td>${item.total_necessario}</td>
+          <td>${item.bipado}</td>
           <td>${item.faltando}</td>
         `;
         tabela.appendChild(row);
