@@ -113,7 +113,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Registro de QR Code</h1>
+    <h1>Registro de QR Code - Fábrica</h1>
 
     <div class="top-bar">
       <input type="text" id="usuario" placeholder="Seu nome" />
@@ -124,9 +124,11 @@
         <input type="range" id="tempoExibicao" min="500" max="3000" value="1000" step="100" />
       </div>
 
+      <button onclick="window.location.href='/obra'">Obra</button>
       <button onclick="window.location.href='/registros'">Ver Registros</button>
       <button onclick="window.location.href='/importar'">Importar Carga</button>
       <button onclick="window.location.href='/relatorio'">Relatório</button>
+
       <button id="cameraButton" title="Escanear QR com Câmera">📷</button>
     </div>
 
@@ -141,11 +143,9 @@
     </div>
   </div>
 
-  <!-- Sons -->
   <audio id="sucesso" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
   <audio id="erro" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
 
-  <!-- Lib de QRCode -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 
   <script>
@@ -228,6 +228,26 @@
       }
     });
 
+    function sincronizarOffline() {
+      const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
+      if (offlineData.length === 0) return;
+
+      offlineData.forEach(item => {
+        fetch("/registrar_qr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item)
+        })
+        .then(res => res.json())
+        .then(() => {
+          sucessoAudio.play();
+          offlineData.shift();
+          localStorage.setItem("offline_qr", JSON.stringify(offlineData));
+        })
+        .catch(() => erroAudio.play());
+      });
+    }
+
     async function iniciarCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -266,28 +286,10 @@
 
     document.getElementById("cameraButton").addEventListener("click", iniciarCamera);
 
-    function sincronizarOffline() {
-      const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
-      if (offlineData.length === 0) return;
-
-      offlineData.forEach(item => {
-        fetch("/registrar_qr", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item)
-        })
-        .then(res => res.json())
-        .then(() => {
-          sucessoAudio.play();
-          offlineData.shift();
-          localStorage.setItem("offline_qr", JSON.stringify(offlineData));
-        })
-        .catch(() => erroAudio.play());
-      });
-    }
-
-    renderizarHistorico();
-    sincronizarOffline();
+    window.onload = () => {
+      renderizarHistorico();
+      sincronizarOffline();
+    };
   </script>
 </body>
 </html>
