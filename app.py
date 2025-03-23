@@ -108,34 +108,6 @@ def listar_qr_obra():
         } for r in registros
     ])
 
-@app.route('/excluir_qr/<int:registro_id>', methods=['DELETE'])
-def excluir_qr(registro_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("DELETE FROM registros_qr WHERE id = %s", (registro_id,))
-        conn.commit()
-        return jsonify({"sucesso": True})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-@app.route('/excluir_qr_obra/<int:registro_id>', methods=['DELETE'])
-def excluir_qr_obra(registro_id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("DELETE FROM recebimento_obra WHERE id = %s", (registro_id,))
-        conn.commit()
-        return jsonify({"sucesso": True})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
     if 'arquivo' not in request.files:
@@ -165,85 +137,26 @@ def upload_lista_carga():
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
-@app.route('/listar_carga')
-def listar_carga():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM lista_de_carga ORDER BY obra")
-    dados = cur.fetchall()
-    colunas = [desc[0] for desc in cur.description]
-    cur.close()
-    conn.close()
-    return jsonify([dict(zip(colunas, linha)) for linha in dados])
-
-@app.route('/relatorio_diferencas')
-def relatorio_diferencas():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT codigo_qr, COUNT(*) AS bipado
-        FROM registros_qr
-        GROUP BY codigo_qr
-    """)
-    bipados = cur.fetchall()
-    bipados_dict = {codigo: qtd for codigo, qtd in bipados}
-
-    cur.execute("""
-        SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
-        FROM lista_de_carga
-        ORDER BY obra, cod_insumo
-    """)
-    lista = cur.fetchall()
-    relatorio = []
-    for linha in lista:
-        cod_insumo, produto, uhs, obra, cargas, total, pav = linha
-        total = int(total)
-        bipado_disponivel = bipados_dict.get(cod_insumo, 0)
-        atendido = min(bipado_disponivel, total)
-        faltando = total - atendido
-        bipados_dict[cod_insumo] = bipado_disponivel - atendido
-        relatorio.append({
-            "cod_insumo": cod_insumo,
-            "produto": produto,
-            "obra": obra,
-            "cargas": cargas,
-            "total_necessario": total,
-            "bipado": atendido,
-            "faltando": faltando
-        })
-    cur.close()
-    conn.close()
-    return jsonify(relatorio)
 @app.route('/relatorio_obra_dados')
 def relatorio_obra_dados():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Consulta a lista de carga (tudo o que precisa ser enviado)
-    cur.execute("""
-        SELECT cod_insumo, produto, obra, cargas, total
-        FROM lista_de_carga
-    """)
+    cur.execute("SELECT cod_insumo, produto, obra, cargas, total FROM lista_de_carga")
     lista = cur.fetchall()
 
-    # Conta os bipados na fábrica (entregues)
-    cur.execute("""
-        SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr
-    """)
+    cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
     bipados = cur.fetchall()
     bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Conta os recebidos na obra
-    cur.execute("""
-        SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr
-    """)
+    cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
     recebidos = cur.fetchall()
     recebidos_dict = {codigo: qtd for codigo, qtd in recebidos}
 
     relatorio = []
     for cod_insumo, produto, obra, cargas, total in lista:
         bipado = bipados_dict.get(cod_insumo, 0)
-        if bipado > 0:  # Somente se foi realmente enviado para a obra
+        if bipado > 0:
             recebido = recebidos_dict.get(cod_insumo, 0)
             faltando = bipado - recebido
             relatorio.append({
@@ -251,13 +164,15 @@ def relatorio_obra_dados():
                 "produto": produto,
                 "obra": obra,
                 "cargas": cargas,
-                "total_necessario": bipado,  # o que foi enviado
-                "bipado": recebido,          # o que a obra confirmou
-                "faltando": faltando         # diferença
+                "total_necessario": bipado,
+                "bipado": recebido,
+                "faltando": faltando
             })
 
     cur.close()
     conn.close()
     return jsonify(relatorio)
+
 if __name__ == '__main__':
     app.run(debug=True)
+
