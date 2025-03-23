@@ -48,10 +48,6 @@
       border-radius: 5px;
     }
 
-    #modoBtn {
-      background-color: #28a745;
-    }
-
     #cameraButton {
       background: none;
       border: none;
@@ -128,12 +124,9 @@
         <input type="range" id="tempoExibicao" min="500" max="3000" value="1000" step="100" />
       </div>
 
-      <button id="modoBtn" onclick="alternarModo()">Modo: Fábrica</button>
-
       <button onclick="window.location.href='/registros'">Ver Registros</button>
       <button onclick="window.location.href='/importar'">Importar Carga</button>
       <button onclick="window.location.href='/relatorio'">Relatório</button>
-
       <button id="cameraButton" title="Escanear QR com Câmera">📷</button>
     </div>
 
@@ -156,31 +149,15 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 
   <script>
-    let modoAtual = "fabrica"; // ou "obra"
-    let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
-
     const qrInput = document.getElementById("qrInput");
-    const usuarioInput = document.getElementById("usuario");
-    const tempoExibicaoInput = document.getElementById("tempoExibicao");
-    const modoBtn = document.getElementById("modoBtn");
     const video = document.getElementById("videoPreview");
     const display = document.getElementById("display");
-    const sucesso = document.getElementById("sucesso");
-    const erro = document.getElementById("erro");
-
+    const listaHistorico = document.getElementById("listaHistorico");
+    const sucessoAudio = document.getElementById("sucesso");
+    const erroAudio = document.getElementById("erro");
     let stream;
 
-    function alternarModo() {
-      if (modoAtual === "fabrica") {
-        modoAtual = "obra";
-        modoBtn.textContent = "Modo: Obra";
-        modoBtn.style.backgroundColor = "#ffc107";
-      } else {
-        modoAtual = "fabrica";
-        modoBtn.textContent = "Modo: Fábrica";
-        modoBtn.style.backgroundColor = "#28a745";
-      }
-    }
+    let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
 
     function atualizarHistorico(qr) {
       historico.unshift(qr);
@@ -190,12 +167,11 @@
     }
 
     function renderizarHistorico() {
-      const lista = document.getElementById("listaHistorico");
-      lista.innerHTML = "";
+      listaHistorico.innerHTML = "";
       historico.forEach(qr => {
         const li = document.createElement("li");
         li.textContent = qr;
-        lista.appendChild(li);
+        listaHistorico.appendChild(li);
       });
     }
 
@@ -210,8 +186,8 @@
     }
 
     function registrarQRCode(codigo_qr) {
-      const usuario = usuarioInput.value.trim();
-      const tempo = parseInt(tempoExibicaoInput.value);
+      const usuario = document.getElementById("usuario").value.trim();
+      const tempo = parseInt(document.getElementById("tempoExibicao").value);
       if (!codigo_qr || !usuario) {
         alert("Preencha o nome e o QR Code!");
         return;
@@ -219,9 +195,7 @@
 
       exibirDisplay(codigo_qr, tempo);
 
-      const rota = modoAtual === "obra" ? "/registrar_qr_obra" : "/registrar_qr";
-
-      fetch(rota, {
+      fetch("/registrar_qr", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ codigo_qr, usuario })
@@ -230,18 +204,18 @@
       .then(data => {
         if (data.mensagem) {
           document.getElementById("mensagem").textContent = data.mensagem;
-          sucesso.play();
+          sucessoAudio.play();
           atualizarHistorico(codigo_qr);
         } else {
-          erro.play();
+          erroAudio.play();
           document.getElementById("mensagem").textContent = data.erro || "Erro ao registrar.";
         }
       })
       .catch(() => {
-        erro.play();
+        erroAudio.play();
         document.getElementById("mensagem").textContent = "Sem conexão. Salvando offline.";
         const offline = JSON.parse(localStorage.getItem("offline_qr")) || [];
-        offline.push({ codigo_qr, usuario, modo: modoAtual });
+        offline.push({ codigo_qr, usuario });
         localStorage.setItem("offline_qr", JSON.stringify(offline));
       });
     }
@@ -297,26 +271,23 @@
       if (offlineData.length === 0) return;
 
       offlineData.forEach(item => {
-        const rota = item.modo === "obra" ? "/registrar_qr_obra" : "/registrar_qr";
-        fetch(rota, {
+        fetch("/registrar_qr", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(item)
         })
         .then(res => res.json())
         .then(() => {
-          sucesso.play();
+          sucessoAudio.play();
           offlineData.shift();
           localStorage.setItem("offline_qr", JSON.stringify(offlineData));
         })
-        .catch(() => erro.play());
+        .catch(() => erroAudio.play());
       });
     }
 
-    window.onload = () => {
-      renderizarHistorico();
-      sincronizarOffline();
-    };
+    renderizarHistorico();
+    sincronizarOffline();
   </script>
 </body>
 </html>
