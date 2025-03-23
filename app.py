@@ -23,6 +23,11 @@ def obra():
 def registros():
     return send_file('registros.html')
 
+@app.route('/lista_carga')
+def lista_carga():
+    return send_file('lista_carga.html')
+
+
 @app.route('/registros_obra')
 def registros_obra():
     return send_file('registros_obra.html')
