@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório de Obra (Bipados)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      margin: 20px;
+      text-align: center;
+    }
+    #filtros {
+      margin-bottom: 20px;
+    }
+    select {
+      padding: 6px;
+      margin: 0 10px;
+      font-size: 14px;
+    }
+    #resumo {
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #e0e0e0;
+    }
+    .btn-container {
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Relatório de Obra (Bipados)</h1>
+
+  <div id="filtros">
+    <label>Obra:
+      <select id="filtroObra"><option value="">Todas</option></select>
+    </label>
+    <label>Produto:
+      <select id="filtroProduto"><option value="">Todos</option></select>
+    </label>
+  </div>
+
+  <div id="resumo">
+    <p>Total Bipado: <span id="resumoBipado">0</span> | Total de Itens: <span id="resumoTotal">0</span></p>
+  </div>
+
+  <div class="btn-container">
+    <button onclick="window.location.href='/'">Voltar</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>COD INSUMO</th>
+        <th>PRODUTO</th>
+        <th>OBRA</th>
+        <th>CARGAS</th>
+        <th>TOTAL NECESSÁRIO</th>
+        <th>BIPADO</th>
+        <th>FALTANDO</th>
+      </tr>
+    </thead>
+    <tbody id="tabelaRelatorio">
+      <tr><td colspan="7">Carregando dados...</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    let dadosGlobais = [];
+
+    function carregarRelatorio() {
+      fetch('/relatorio_diferencas')
+        .then(res => res.json())
+        .then(data => {
+          dadosGlobais = data.filter(item => item.bipado > 0); // Apenas bipados
+          preencherFiltros(dadosGlobais);
+          renderizarTabela(dadosGlobais);
+        })
+        .catch(() => {
+          document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Erro ao carregar dados.</td></tr>';
+        });
+    }
+
+    function preencherFiltros(data) {
+      const obras = [...new Set(data.map(d => d.obra))];
+      const produtos = [...new Set(data.map(d => d.produto))];
+
+      const obraSelect = document.getElementById('filtroObra');
+      const produtoSelect = document.getElementById('filtroProduto');
+
+      obras.forEach(obra => {
+        const opt = document.createElement('option');
+        opt.value = obra;
+        opt.textContent = obra;
+        obraSelect.appendChild(opt);
+      });
+
+      produtos.forEach(prod => {
+        const opt = document.createElement('option');
+        opt.value = prod;
+        opt.textContent = prod;
+        produtoSelect.appendChild(opt);
+      });
+    }
+
+    function renderizarTabela(data) {
+      const filtroObra = document.getElementById('filtroObra').value;
+      const filtroProduto = document.getElementById('filtroProduto').value;
+      const tabela = document.getElementById('tabelaRelatorio');
+      tabela.innerHTML = '';
+
+      let totalBipado = 0;
+
+      const filtrado = data.filter(item =>
+        (!filtroObra || item.obra === filtroObra) &&
+        (!filtroProduto || item.produto === filtroProduto)
+      );
+
+      if (filtrado.length === 0) {
+        tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
+        return;
+      }
+
+      filtrado.forEach(item => {
+        totalBipado += item.bipado;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.cod_insumo}</td>
+          <td>${item.produto}</td>
+          <td>${item.obra}</td>
+          <td>${item.cargas}</td>
+          <td>${item.total_necessario}</td>
+          <td>${item.bipado}</td>
+          <td>${item.faltando}</td>
+        `;
+        tabela.appendChild(row);
+      });
+
+      document.getElementById('resumoBipado').textContent = totalBipado;
+      document.getElementById('resumoTotal').textContent = filtrado.length;
+    }
+
+    document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
+    document.getElementById('filtroProduto').addEventListener('change', () => renderizarTabela(dadosGlobais));
+
+    carregarRelatorio();
+  </script>
+</body>
+</html>
