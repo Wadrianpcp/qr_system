@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify, send_file
 import psycopg2
+from psycopg2.extras import RealDictCursor
+from datetime import datetime, timedelta
 import pandas as pd
-from datetime import datetime
-import pytz
 
 app = Flask(__name__)
 
@@ -14,6 +14,10 @@ def get_db_connection():
 @app.route('/')
 def index():
     return send_file('index.html')
+
+@app.route('/obra')
+def obra():
+    return send_file('obra.html')
 
 @app.route('/registros')
 def registros():
@@ -52,6 +56,27 @@ def registrar_qr():
         cur.close()
         conn.close()
 
+@app.route('/registrar_qr_obra', methods=['POST'])
+def registrar_qr_obra():
+    data = request.json
+    codigo_qr = data.get('codigo_qr')
+    usuario = data.get('usuario')
+
+    if not codigo_qr or not usuario:
+        return jsonify({"erro": "Código QR e usuário são obrigatórios"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO recebimento_obra (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
+        conn.commit()
+        return jsonify({"mensagem": "QR Code registrado com sucesso no modo Obra!"}), 201
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 @app.route('/listar_qr', methods=['GET'])
 def listar_qr():
     conn = get_db_connection()
@@ -61,12 +86,11 @@ def listar_qr():
     cur.close()
     conn.close()
 
-    tz = pytz.timezone('America/Sao_Paulo')
     registros_formatados = [
         {
             "id": r[0],
             "codigo_qr": r[1],
-            "data_hora": r[2].astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[2] else "",
+            "data_hora": (r[2] - timedelta(hours=3)).strftime("%d/%m/%Y %H:%M:%S") if r[2] else "",
             "usuario": r[3],
             "status": r[4]
         }
@@ -74,16 +98,16 @@ def listar_qr():
     ]
     return jsonify(registros_formatados)
 
-@app.route('/excluir_qr/<int:id>', methods=['DELETE'])
-def excluir_qr(id):
+@app.route('/excluir_qr/<int:registro_id>', methods=['DELETE'])
+def excluir_qr(registro_id):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("DELETE FROM registros_qr WHERE id = %s", (id,))
+        cur.execute("DELETE FROM registros_qr WHERE id = %s", (registro_id,))
         conn.commit()
         return jsonify({"sucesso": True})
     except Exception as e:
-        return jsonify({"sucesso": False, "erro": str(e)})
+        return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
         conn.close()
@@ -107,10 +131,13 @@ def upload_lista_carga():
         cur = conn.cursor()
 
         for _, row in df.iterrows():
-            cur.execute(
-                "INSERT INTO lista_de_carga (cod_insumo, produto, uhs, obra, cargas, total, pav) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (row["COD INSUMO"], row["PRODUTO"], row["UHS"], row["OBRA"], row["CARGAS"], row["TOTAL"], row["PAV"])
-            )
+            cur.execute("""
+                INSERT INTO lista_de_carga (cod_insumo, produto, uhs, obra, cargas, total, pav)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                row["COD INSUMO"], row["PRODUTO"], row["UHS"], row["OBRA"],
+                row["CARGAS"], row["TOTAL"], row["PAV"]
+            ))
 
         conn.commit()
         cur.close()
@@ -125,7 +152,7 @@ def upload_lista_carga():
 def listar_carga():
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM lista_de_carga ORDER BY OBRA")
+    cur.execute("SELECT * FROM lista_de_carga ORDER BY obra")
     dados = cur.fetchall()
     colunas = [desc[0] for desc in cur.description]
     cur.close()
@@ -139,17 +166,27 @@ def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM registros_qr GROUP BY codigo_qr")
+    # Conta quantos registros existem por código QR
+    cur.execute("""
+        SELECT codigo_qr, COUNT(*) AS bipado
+        FROM registros_qr
+        GROUP BY codigo_qr
+    """)
     bipados = cur.fetchall()
     bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
+    cur.execute("""
+        SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
+        FROM lista_de_carga
+        ORDER BY obra, cod_insumo
+    """)
     lista = cur.fetchall()
     relatorio = []
 
     for linha in lista:
         cod_insumo, produto, uhs, obra, cargas, total, pav = linha
         total = int(total)
+
         bipado_disponivel = bipados_dict.get(cod_insumo, 0)
         atendido = min(bipado_disponivel, total)
         faltando = total - atendido
@@ -167,7 +204,6 @@ def relatorio_diferencas():
 
     cur.close()
     conn.close()
-
     return jsonify(relatorio)
 
 if __name__ == '__main__':
