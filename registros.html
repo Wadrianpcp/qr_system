@@ -53,11 +53,6 @@
       cursor: pointer;
     }
 
-    #voltar {
-      margin-bottom: 20px;
-      background-color: #0275d8;
-    }
-
     .mensagem {
       margin-top: 15px;
       font-weight: bold;
@@ -71,13 +66,9 @@
       color: red;
     }
 
-    #leitorQR {
-      margin-top: 20px;
-      display: none;
-    }
-
-    #leitorQR video {
-      width: 100% !important;
+    #voltar {
+      margin-bottom: 20px;
+      background-color: #0275d8;
     }
   </style>
 </head>
@@ -93,12 +84,9 @@
     <select id="filtroUsuario">
       <option value="">Filtrar por Usuário</option>
     </select>
-    <button onclick="abrirLeitorQR()">📷 Usar câmera</button>
   </div>
 
   <div id="mensagem" class="mensagem"></div>
-
-  <div id="leitorQR"></div>
 
   <table>
     <thead>
@@ -114,12 +102,8 @@
     </tbody>
   </table>
 
-  <!-- Bibliotecas -->
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
   <script>
     let registros = [];
-    let scannerAtivo = false;
 
     function carregarRegistros() {
       fetch('/listar_qr')
@@ -141,7 +125,6 @@
       const selUsuario = document.getElementById('filtroUsuario');
       const selQR = document.getElementById('filtroQR');
 
-      selUsuario.innerHTML = '<option value="">Filtrar por Usuário</option>';
       usuarios.forEach(user => {
         const opt = document.createElement('option');
         opt.value = user;
@@ -149,11 +132,80 @@
         selUsuario.appendChild(opt);
       });
 
-      selQR.innerHTML = '<option value="">Filtrar por Código QR</option>';
       codigos.forEach(cod => {
         const opt = document.createElement('option');
         opt.value = cod;
         opt.textContent = cod;
+        selQR.appendChild(opt);
+      });
+    }
+
+    function renderizarTabela() {
+      const filtroUsuario = document.getElementById('filtroUsuario').value;
+      const filtroQR = document.getElementById('filtroQR').value;
+
+      const tabela = document.getElementById('tabelaRegistros');
+      tabela.innerHTML = "";
+
+      const filtrado = registros.filter(r =>
+        (!filtroUsuario || r.usuario === filtroUsuario) &&
+        (!filtroQR || r.codigo_qr === filtroQR)
+      );
+
+      if (filtrado.length === 0) {
+        tabela.innerHTML = "<tr><td colspan='4'>Nenhum registro encontrado.</td></tr>";
+        return;
+      }
+
+      filtrado.forEach(r => {
+        const linha = 
+          <tr>
+            <td>${r.id}</td>
+            <td>${r.codigo_qr}</td>
+            <td>${r.usuario}</td>
+            <td><button onclick="excluirRegistro(${r.id})">Excluir</button></td>
+          </tr>
+        ;
+        tabela.innerHTML += linha;
+      });
+    }
+
+    function excluirRegistro(id) {
+      const senha = prompt("Digite a senha para excluir o registro:");
+      if (senha !== "@pcp1234") {
+        mostrarMensagem("Senha incorreta. Ação não autorizada.", false);
+        return;
+      }
+
+      fetch(/excluir_qr/${id}, { method: 'DELETE' })
+        .then(res => res.json())
+        .then(res => {
+          if (res.sucesso) {
+            mostrarMensagem("Registro excluído com sucesso!", true);
+            carregarRegistros();
+            new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg').play();
+          } else {
+            mostrarMensagem("Erro ao excluir o registro.", false);
+          }
+        })
+        .catch(() => {
+          mostrarMensagem("Erro ao comunicar com o servidor.", false);
+        });
+    }
+
+    function mostrarMensagem(msg, sucesso) {
+      const el = document.getElementById("mensagem");
+      el.textContent = msg;
+      el.className = "mensagem " + (sucesso ? "sucesso" : "erro");
+    }
+
+    document.getElementById('filtroUsuario').addEventListener('change', renderizarTabela);
+    document.getElementById('filtroQR').addEventListener('change', renderizarTabela);
+
+    window.onload = carregarRegistros;
+  </script>
+</body>
+</html>        opt.textContent = cod;
         selQR.appendChild(opt);
       });
     }
