@@ -2,128 +2,188 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Bipagem na Obra</title>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <title>Recebimento na Obra</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Roboto', sans-serif;
-      background-color: #f4f4f4;
       margin: 0;
       padding: 20px;
+      background-color: #f4f4f4;
+      color: #333;
       text-align: center;
     }
+
     h1 {
-      color: #333;
+      font-size: 24px;
+      margin-bottom: 10px;
     }
-    #camera-preview {
-      width: 100%;
-      max-width: 400px;
+
+    #camera, #ultimos {
       margin: 20px auto;
+      max-width: 400px;
+    }
+
+    video {
+      width: 100%;
       border: 2px solid #ccc;
+      border-radius: 8px;
     }
-    input, button {
+
+    input {
+      font-size: 18px;
       padding: 10px;
-      font-size: 16px;
-      margin: 10px 5px;
+      width: 90%;
+      max-width: 400px;
+      margin: 10px 0;
     }
-    #ultimos-registros {
-      margin-top: 30px;
-      text-align: left;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
-    }
+
     ul {
       list-style: none;
       padding: 0;
+      margin-top: 10px;
     }
+
     li {
-      background-color: #fff;
-      padding: 10px;
+      background: #fff;
+      margin: 4px 0;
+      padding: 6px 12px;
+      border-radius: 4px;
       border: 1px solid #ddd;
-      margin-bottom: 5px;
+    }
+
+    .botao {
+      padding: 10px 20px;
+      margin: 10px 5px;
+      font-weight: bold;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background-color: #1976d2;
+      color: white;
+    }
+
+    .botao:hover {
+      background-color: #125ea2;
+    }
+
+    .mensagem {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .erro {
+      color: red;
+    }
+
+    .sucesso {
+      color: green;
     }
   </style>
 </head>
 <body>
-  <h1>Bipagem na Obra</h1>
+  <h1>Recebimento na Obra</h1>
 
-  <input type="text" id="inputQR" placeholder="Escaneie ou digite o QR Code" autofocus>
-  <input type="text" id="inputUsuario" placeholder="Usuário">
-  <button onclick="registrarQR()">Registrar</button>
-  <button onclick="window.location.href='/registros_obra'">Ver Registros da Obra</button>
-  <button onclick="iniciarCamera()">Ativar Câmera</button>
+  <input type="text" id="usuario" placeholder="Digite seu nome">
 
-  <video id="camera-preview" playsinline></video>
-
-  <div id="ultimos-registros">
-    <h3>Últimos QR Codes Bipados:</h3>
-    <ul id="listaRegistros"></ul>
+  <div id="camera">
+    <video id="preview" playsinline></video>
   </div>
 
-  <audio id="audio-ok" src="ok.mp3" preload="auto"></audio>
-  <audio id="audio-erro" src="erro.mp3" preload="auto"></audio>
+  <input type="text" id="codigo_qr" placeholder="Escaneie ou digite o QR Code" autofocus>
 
-  <script src="https://unpkg.com/@zxing/browser@latest"></script>
+  <div class="mensagem" id="mensagem"></div>
+
+  <button class="botao" onclick="window.location.href='/registros_obra'">Ver Registros da Obra</button>
+  <button class="botao" onclick="startScanner()">Ativar Câmera</button>
+
+  <div id="ultimos">
+    <h3>Últimos bipados na obra:</h3>
+    <ul id="listaUltimos"></ul>
+  </div>
+
+  <audio id="sucesso" src="success.mp3" preload="auto"></audio>
+  <audio id="erro" src="error.mp3" preload="auto"></audio>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script>
-    const inputQR = document.getElementById('inputQR');
-    const inputUsuario = document.getElementById('inputUsuario');
-    const listaRegistros = document.getElementById('listaRegistros');
-    const audioOk = document.getElementById('audio-ok');
-    const audioErro = document.getElementById('audio-erro');
+    let ultimos = [];
 
-    function registrarQR() {
-      const codigo = inputQR.value.trim();
-      const usuario = inputUsuario.value.trim();
+    function atualizarUltimos(qr) {
+      ultimos.unshift(qr);
+      if (ultimos.length > 10) ultimos.pop();
+      const ul = document.getElementById('listaUltimos');
+      ul.innerHTML = '';
+      ultimos.forEach(qr => {
+        const li = document.createElement('li');
+        li.textContent = qr;
+        ul.appendChild(li);
+      });
+    }
 
-      if (!codigo || !usuario) {
-        alert('Informe o QR Code e o usuário.');
+    function mostrarMensagem(texto, tipo) {
+      const el = document.getElementById('mensagem');
+      el.textContent = texto;
+      el.className = 'mensagem ' + tipo;
+    }
+
+    async function registrar(codigo) {
+      const usuario = document.getElementById('usuario').value.trim();
+      if (!usuario) {
+        mostrarMensagem("Informe o nome do usuário!", "erro");
+        document.getElementById('erro').play();
         return;
       }
 
-      fetch('/registrar_qr_obra', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({codigo_qr: codigo, usuario: usuario})
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.mensagem) {
-          audioOk.play();
-          inputQR.value = '';
-          carregarUltimosRegistros();
-        } else {
-          audioErro.play();
-          alert(data.erro || 'Erro ao registrar.');
-        }
-      });
-    }
-
-    function carregarUltimosRegistros() {
-      fetch('/listar_qr_obra')
-        .then(res => res.json())
-        .then(dados => {
-          listaRegistros.innerHTML = '';
-          dados.slice(0, 10).forEach(r => {
-            const li = document.createElement('li');
-            li.textContent = `${r.codigo_qr} - ${r.usuario} - ${r.data_hora}`;
-            listaRegistros.appendChild(li);
-          });
+      try {
+        const response = await fetch('/registrar_qr_obra', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ codigo_qr: codigo, usuario: usuario })
         });
+
+        const data = await response.json();
+        if (response.ok) {
+          mostrarMensagem(data.mensagem, "sucesso");
+          document.getElementById('sucesso').play();
+          atualizarUltimos(codigo);
+        } else {
+          mostrarMensagem(data.erro || "Erro ao registrar QR Code", "erro");
+          document.getElementById('erro').play();
+        }
+      } catch (err) {
+        mostrarMensagem("Erro de conexão com o servidor.", "erro");
+        document.getElementById('erro').play();
+      }
+
+      document.getElementById('codigo_qr').value = '';
     }
 
-    function iniciarCamera() {
-      const codeReader = new ZXing.BrowserMultiFormatReader();
-      codeReader.decodeFromVideoDevice(null, 'camera-preview', (result, err) => {
-        if (result) {
-          inputQR.value = result.text;
-          registrarQR();
-          codeReader.reset();
-        }
+    document.getElementById('codigo_qr').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        const codigo = e.target.value.trim();
+        if (codigo) registrar(codigo);
+      }
+    });
+
+    function startScanner() {
+      const qrScanner = new Html5Qrcode("preview");
+      qrScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        qrCodeMessage => {
+          registrar(qrCodeMessage);
+          qrScanner.stop().then(() => {
+            document.getElementById('preview').srcObject = null;
+          });
+        },
+        errorMessage => {}
+      ).catch(err => {
+        mostrarMensagem("Erro ao iniciar a câmera", "erro");
       });
     }
-
-    carregarUltimosRegistros();
   </script>
 </body>
 </html>
