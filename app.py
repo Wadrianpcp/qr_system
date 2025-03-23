@@ -254,6 +254,47 @@ def relatorio_obra_dados():
     cur.close()
     conn.close()
     return jsonify(relatorio)
+@app.route('/relatorio_obra_final')
+def relatorio_obra_final():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Obtém o estoque real da obra (tudo que foi bipado no recebimento_obra)
+    cur.execute("""
+        SELECT codigo_qr, COUNT(*) AS estoque
+        FROM recebimento_obra
+        GROUP BY codigo_qr
+    """)
+    estoque = cur.fetchall()
+    estoque_dict = {codigo: qtd for codigo, qtd in estoque}
+
+    # Obtém a demanda da obra, ou seja, tudo que foi bipado como entrega
+    cur.execute("""
+        SELECT r.codigo_qr, lc.produto, lc.obra, lc.cod_insumo, COUNT(*) AS necessario
+        FROM registros_qr r
+        JOIN lista_de_carga lc ON lc.cod_insumo = r.codigo_qr
+        GROUP BY r.codigo_qr, lc.produto, lc.obra, lc.cod_insumo
+    """)
+    demandas = cur.fetchall()
+
+    relatorio = []
+    for codigo_qr, produto, obra, cod_insumo, necessario in demandas:
+        disponivel = estoque_dict.get(codigo_qr, 0)
+        atendido = min(necessario, disponivel)
+        faltando = necessario - atendido
+        relatorio.append({
+            "cod_insumo": cod_insumo,
+            "produto": produto,
+            "obra": obra,
+            "estoque": disponivel,
+            "necessario": necessario,
+            "atendido": atendido,
+            "faltando": faltando
+        })
+
+    cur.close()
+    conn.close()
+    return jsonify(relatorio)
 
 if __name__ == '__main__':
     app.run(debug=True)
