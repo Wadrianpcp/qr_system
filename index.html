@@ -158,12 +158,15 @@
   <script>
     let modoAtual = "fabrica"; // ou "obra"
     let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
+
     const qrInput = document.getElementById("qrInput");
     const usuarioInput = document.getElementById("usuario");
     const tempoExibicaoInput = document.getElementById("tempoExibicao");
     const modoBtn = document.getElementById("modoBtn");
     const video = document.getElementById("videoPreview");
     const display = document.getElementById("display");
+    const sucesso = document.getElementById("sucesso");
+    const erro = document.getElementById("erro");
 
     let stream;
 
@@ -216,7 +219,7 @@
 
       exibirDisplay(codigo_qr, tempo);
 
-      const rota = modoAtual === "fabrica" ? "/registrar_qr" : "/registrar_qr_obra";
+      const rota = modoAtual === "obra" ? "/registrar_qr_obra" : "/registrar_qr";
 
       fetch(rota, {
         method: "POST",
@@ -289,11 +292,6 @@
 
     document.getElementById("cameraButton").addEventListener("click", iniciarCamera);
 
-    window.onload = () => {
-      renderizarHistorico();
-      sincronizarOffline();
-    };
-
     function sincronizarOffline() {
       const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
       if (offlineData.length === 0) return;
@@ -307,13 +305,18 @@
         })
         .then(res => res.json())
         .then(() => {
-          sucessoAudio.play();
+          sucesso.play();
           offlineData.shift();
           localStorage.setItem("offline_qr", JSON.stringify(offlineData));
         })
-        .catch(() => erroAudio.play());
+        .catch(() => erro.play());
       });
     }
+
+    window.onload = () => {
+      renderizarHistorico();
+      sincronizarOffline();
+    };
   </script>
 </body>
 </html>
