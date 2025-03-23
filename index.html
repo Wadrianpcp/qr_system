@@ -48,6 +48,10 @@
       border-radius: 5px;
     }
 
+    #modoBtn {
+      background-color: #28a745;
+    }
+
     #cameraButton {
       background: none;
       border: none;
@@ -124,6 +128,8 @@
         <input type="range" id="tempoExibicao" min="500" max="3000" value="1000" step="100" />
       </div>
 
+      <button id="modoBtn" onclick="alternarModo()">Modo: Fábrica</button>
+
       <button onclick="window.location.href='/registros'">Ver Registros</button>
       <button onclick="window.location.href='/importar'">Importar Carga</button>
       <button onclick="window.location.href='/relatorio'">Relatório</button>
@@ -150,16 +156,28 @@
   <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 
   <script>
+    let modoAtual = "fabrica"; // ou "obra"
+    let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
     const qrInput = document.getElementById("qrInput");
+    const usuarioInput = document.getElementById("usuario");
+    const tempoExibicaoInput = document.getElementById("tempoExibicao");
+    const modoBtn = document.getElementById("modoBtn");
     const video = document.getElementById("videoPreview");
-    const cameraButton = document.getElementById("cameraButton");
     const display = document.getElementById("display");
-    const listaHistorico = document.getElementById("listaHistorico");
-    const sucessoAudio = document.getElementById("sucesso");
-    const erroAudio = document.getElementById("erro");
+
     let stream;
 
-    let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
+    function alternarModo() {
+      if (modoAtual === "fabrica") {
+        modoAtual = "obra";
+        modoBtn.textContent = "Modo: Obra";
+        modoBtn.style.backgroundColor = "#ffc107";
+      } else {
+        modoAtual = "fabrica";
+        modoBtn.textContent = "Modo: Fábrica";
+        modoBtn.style.backgroundColor = "#28a745";
+      }
+    }
 
     function atualizarHistorico(qr) {
       historico.unshift(qr);
@@ -169,11 +187,12 @@
     }
 
     function renderizarHistorico() {
-      listaHistorico.innerHTML = "";
+      const lista = document.getElementById("listaHistorico");
+      lista.innerHTML = "";
       historico.forEach(qr => {
         const li = document.createElement("li");
         li.textContent = qr;
-        listaHistorico.appendChild(li);
+        lista.appendChild(li);
       });
     }
 
@@ -188,8 +207,8 @@
     }
 
     function registrarQRCode(codigo_qr) {
-      const usuario = document.getElementById("usuario").value.trim();
-      const tempo = parseInt(document.getElementById("tempoExibicao").value);
+      const usuario = usuarioInput.value.trim();
+      const tempo = parseInt(tempoExibicaoInput.value);
       if (!codigo_qr || !usuario) {
         alert("Preencha o nome e o QR Code!");
         return;
@@ -197,7 +216,9 @@
 
       exibirDisplay(codigo_qr, tempo);
 
-      fetch("/registrar_qr", {
+      const rota = modoAtual === "fabrica" ? "/registrar_qr" : "/registrar_qr_obra";
+
+      fetch(rota, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ codigo_qr, usuario })
@@ -206,18 +227,18 @@
       .then(data => {
         if (data.mensagem) {
           document.getElementById("mensagem").textContent = data.mensagem;
-          sucessoAudio.play();
+          sucesso.play();
           atualizarHistorico(codigo_qr);
         } else {
-          erroAudio.play();
+          erro.play();
           document.getElementById("mensagem").textContent = data.erro || "Erro ao registrar.";
         }
       })
       .catch(() => {
-        erroAudio.play();
+        erro.play();
         document.getElementById("mensagem").textContent = "Sem conexão. Salvando offline.";
         const offline = JSON.parse(localStorage.getItem("offline_qr")) || [];
-        offline.push({ codigo_qr, usuario });
+        offline.push({ codigo_qr, usuario, modo: modoAtual });
         localStorage.setItem("offline_qr", JSON.stringify(offline));
       });
     }
@@ -229,28 +250,6 @@
         qrInput.value = "";
       }
     });
-
-    function sincronizarOffline() {
-      const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
-      if (offlineData.length === 0) return;
-
-      offlineData.forEach(item => {
-        fetch("/registrar_qr", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item)
-        })
-        .then(res => res.json())
-        .then(() => {
-          sucessoAudio.play();
-          offlineData.shift(); // remove item enviado
-          localStorage.setItem("offline_qr", JSON.stringify(offlineData));
-        })
-        .catch(() => {
-          erroAudio.play();
-        });
-      });
-    }
 
     async function iniciarCamera() {
       try {
@@ -288,10 +287,33 @@
       }
     }
 
-    cameraButton.addEventListener("click", iniciarCamera);
+    document.getElementById("cameraButton").addEventListener("click", iniciarCamera);
 
-    renderizarHistorico();
-    sincronizarOffline();
+    window.onload = () => {
+      renderizarHistorico();
+      sincronizarOffline();
+    };
+
+    function sincronizarOffline() {
+      const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
+      if (offlineData.length === 0) return;
+
+      offlineData.forEach(item => {
+        const rota = item.modo === "obra" ? "/registrar_qr_obra" : "/registrar_qr";
+        fetch(rota, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item)
+        })
+        .then(res => res.json())
+        .then(() => {
+          sucessoAudio.play();
+          offlineData.shift();
+          localStorage.setItem("offline_qr", JSON.stringify(offlineData));
+        })
+        .catch(() => erroAudio.play());
+      });
+    }
   </script>
 </body>
 </html>
