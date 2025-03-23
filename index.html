@@ -8,14 +8,15 @@
   <style>
     body {
       font-family: 'Roboto', sans-serif;
-      margin: 0;
-      padding: 0;
       background-color: #f9f9f9;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
     }
 
     .container {
-      padding: 20px;
-      text-align: center;
+      max-width: 800px;
+      margin: auto;
     }
 
     h1 {
@@ -47,8 +48,21 @@
       border-radius: 5px;
     }
 
-    button:hover {
-      background-color: #125ea8;
+    #cameraButton {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: #1976d2;
+    }
+
+    #videoPreview {
+      display: none;
+      width: 100%;
+      max-width: 500px;
+      margin: 10px auto;
+      border: 2px solid #1976d2;
+      border-radius: 10px;
     }
 
     #mensagem {
@@ -66,16 +80,14 @@
       background-color: black;
       color: limegreen;
       font-size: 5vw;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
-      display: none;
       z-index: 999;
     }
 
     #historico {
       margin-top: 30px;
-      text-align: center;
     }
 
     #historico ul {
@@ -97,13 +109,6 @@
       align-items: center;
       gap: 10px;
     }
-
-    #qr-video {
-      margin-top: 20px;
-      width: 100%;
-      max-width: 400px;
-      display: none;
-    }
   </style>
 </head>
 <body>
@@ -122,10 +127,11 @@
       <button onclick="window.location.href='/registros'">Ver Registros</button>
       <button onclick="window.location.href='/importar'">Importar Carga</button>
       <button onclick="window.location.href='/relatorio'">Relatório</button>
-      <button onclick="ativarCamera()">Ler QR com Câmera</button>
+
+      <button id="cameraButton" title="Escanear QR com Câmera">📷</button>
     </div>
 
-    <video id="qr-video" autoplay></video>
+    <video id="videoPreview" playsinline></video>
 
     <div id="mensagem"></div>
     <div id="display"></div>
@@ -140,16 +146,19 @@
   <audio id="sucesso" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
   <audio id="erro" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
 
-  <!-- Biblioteca jsQR -->
-  <script src="https://unpkg.com/jsqr"></script>
+  <!-- Lib de QRCode -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 
   <script>
     const qrInput = document.getElementById("qrInput");
+    const video = document.getElementById("videoPreview");
+    const cameraButton = document.getElementById("cameraButton");
     const display = document.getElementById("display");
     const listaHistorico = document.getElementById("listaHistorico");
     const sucessoAudio = document.getElementById("sucesso");
     const erroAudio = document.getElementById("erro");
-    const video = document.getElementById("qr-video");
+    let stream;
+
     let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
 
     function atualizarHistorico(qr) {
@@ -178,36 +187,9 @@
       }, tempo);
     }
 
-    function sincronizarOffline() {
-      const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
-      if (offlineData.length === 0) return;
-
-      offlineData.forEach(item => {
-        fetch("/registrar_qr", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item)
-        })
-        .then(res => res.json())
-        .then(() => {
-          sucessoAudio.play();
-          offlineData.shift();
-          localStorage.setItem("offline_qr", JSON.stringify(offlineData));
-        })
-        .catch(() => {
-          erroAudio.play();
-        });
-      });
-    }
-
-    qrInput.addEventListener("keypress", function (event) {
-      if (event.key === "Enter") processarQR(qrInput.value.trim());
-    });
-
-    function processarQR(codigo_qr) {
+    function registrarQRCode(codigo_qr) {
       const usuario = document.getElementById("usuario").value.trim();
       const tempo = parseInt(document.getElementById("tempoExibicao").value);
-
       if (!codigo_qr || !usuario) {
         alert("Preencha o nome e o QR Code!");
         return;
@@ -238,38 +220,75 @@
         offline.push({ codigo_qr, usuario });
         localStorage.setItem("offline_qr", JSON.stringify(offline));
       });
-
-      qrInput.value = "";
     }
 
-    function ativarCamera() {
-      const constraints = { video: { facingMode: "environment" } };
-      navigator.mediaDevices.getUserMedia(constraints).then(stream => {
+    qrInput.addEventListener("keypress", function (event) {
+      if (event.key === "Enter") {
+        const codigo_qr = qrInput.value.trim();
+        registrarQRCode(codigo_qr);
+        qrInput.value = "";
+      }
+    });
+
+    function sincronizarOffline() {
+      const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
+      if (offlineData.length === 0) return;
+
+      offlineData.forEach(item => {
+        fetch("/registrar_qr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item)
+        })
+        .then(res => res.json())
+        .then(() => {
+          sucessoAudio.play();
+          offlineData.shift(); // remove item enviado
+          localStorage.setItem("offline_qr", JSON.stringify(offlineData));
+        })
+        .catch(() => {
+          erroAudio.play();
+        });
+      });
+    }
+
+    async function iniciarCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         video.srcObject = stream;
         video.style.display = "block";
+        video.play();
         const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d");
 
-        const interval = setInterval(() => {
+        const scan = () => {
           if (video.readyState === video.HAVE_ENOUGH_DATA) {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(imageData.data, canvas.width, canvas.height);
-
             if (code) {
-              clearInterval(interval);
-              video.srcObject.getTracks().forEach(track => track.stop());
-              video.style.display = "none";
-              processarQR(code.data);
+              pararCamera();
+              registrarQRCode(code.data);
             }
           }
-        }, 500);
-      }).catch(() => {
-        alert("Não foi possível acessar a câmera.");
-      });
+          requestAnimationFrame(scan);
+        };
+        scan();
+      } catch (err) {
+        alert("Erro ao acessar câmera: " + err.message);
+      }
     }
+
+    function pararCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        video.style.display = "none";
+      }
+    }
+
+    cameraButton.addEventListener("click", iniciarCamera);
 
     renderizarHistorico();
     sincronizarOffline();
