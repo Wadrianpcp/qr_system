@@ -92,17 +92,17 @@
       border-radius: 4px;
     }
 
-    #video-preview {
-      width: 300px;
-      height: auto;
-      margin: 20px auto;
-      display: none;
-    }
-
     .slider-container {
       display: flex;
       align-items: center;
       gap: 10px;
+    }
+
+    #qr-video {
+      margin-top: 20px;
+      width: 100%;
+      max-width: 400px;
+      display: none;
     }
   </style>
 </head>
@@ -122,9 +122,11 @@
       <button onclick="window.location.href='/registros'">Ver Registros</button>
       <button onclick="window.location.href='/importar'">Importar Carga</button>
       <button onclick="window.location.href='/relatorio'">Relatório</button>
+      <button onclick="ativarCamera()">Ler QR com Câmera</button>
     </div>
 
-    <video id="video-preview" autoplay></video>
+    <video id="qr-video" autoplay></video>
+
     <div id="mensagem"></div>
     <div id="display"></div>
 
@@ -138,8 +140,8 @@
   <audio id="sucesso" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
   <audio id="erro" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
 
-  <!-- JS Libraries -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- Biblioteca jsQR -->
+  <script src="https://unpkg.com/jsqr"></script>
 
   <script>
     const qrInput = document.getElementById("qrInput");
@@ -147,6 +149,7 @@
     const listaHistorico = document.getElementById("listaHistorico");
     const sucessoAudio = document.getElementById("sucesso");
     const erroAudio = document.getElementById("erro");
+    const video = document.getElementById("qr-video");
     let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
 
     function atualizarHistorico(qr) {
@@ -179,7 +182,7 @@
       const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
       if (offlineData.length === 0) return;
 
-      offlineData.forEach((item, index) => {
+      offlineData.forEach(item => {
         fetch("/registrar_qr", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -188,7 +191,7 @@
         .then(res => res.json())
         .then(() => {
           sucessoAudio.play();
-          offlineData.splice(index, 1);
+          offlineData.shift();
           localStorage.setItem("offline_qr", JSON.stringify(offlineData));
         })
         .catch(() => {
@@ -198,10 +201,7 @@
     }
 
     qrInput.addEventListener("keypress", function (event) {
-      if (event.key === "Enter") {
-        processarQR(qrInput.value.trim());
-        qrInput.value = "";
-      }
+      if (event.key === "Enter") processarQR(qrInput.value.trim());
     });
 
     function processarQR(codigo_qr) {
@@ -210,12 +210,6 @@
 
       if (!codigo_qr || !usuario) {
         alert("Preencha o nome e o QR Code!");
-        return;
-      }
-
-      if (historico.includes(codigo_qr)) {
-        erroAudio.play();
-        document.getElementById("mensagem").textContent = "Este QR Code já foi bipado.";
         return;
       }
 
@@ -244,29 +238,41 @@
         offline.push({ codigo_qr, usuario });
         localStorage.setItem("offline_qr", JSON.stringify(offline));
       });
+
+      qrInput.value = "";
     }
 
-    function iniciarLeitorCamera() {
-      const videoEl = document.getElementById("video-preview");
-      videoEl.style.display = "block";
+    function ativarCamera() {
+      const constraints = { video: { facingMode: "environment" } };
+      navigator.mediaDevices.getUserMedia(constraints).then(stream => {
+        video.srcObject = stream;
+        video.style.display = "block";
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
 
-      const qrScanner = new Html5Qrcode("video-preview");
-      qrScanner.start({ facingMode: "environment" }, {
-        fps: 10,
-        qrbox: 250
-      }, (decodedText) => {
-        qrScanner.stop();
-        videoEl.style.display = "none";
-        processarQR(decodedText);
+        const interval = setInterval(() => {
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+            if (code) {
+              clearInterval(interval);
+              video.srcObject.getTracks().forEach(track => track.stop());
+              video.style.display = "none";
+              processarQR(code.data);
+            }
+          }
+        }, 500);
+      }).catch(() => {
+        alert("Não foi possível acessar a câmera.");
       });
     }
 
-    // Ativa a leitura de QR automaticamente
-    window.onload = function () {
-      renderizarHistorico();
-      sincronizarOffline();
-      iniciarLeitorCamera();
-    };
+    renderizarHistorico();
+    sincronizarOffline();
   </script>
 </body>
 </html>
