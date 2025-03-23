@@ -214,46 +214,48 @@ def relatorio_diferencas():
     cur.close()
     conn.close()
     return jsonify(relatorio)
-
 @app.route('/relatorio_obra_dados')
 def relatorio_obra_dados():
     conn = get_db_connection()
     cur = conn.cursor()
 
+    # Consulta o que foi bipado como entrega
     cur.execute("""
-        SELECT codigo_qr, COUNT(*) AS estoque
+        SELECT r.codigo_qr, lc.produto, lc.obra, lc.cod_insumo, COUNT(*) AS necessario
+        FROM registros_qr r
+        JOIN lista_de_carga lc ON lc.cod_insumo = r.codigo_qr
+        GROUP BY r.codigo_qr, lc.produto, lc.obra, lc.cod_insumo
+    """)
+    entregues = cur.fetchall()
+
+    # Consulta o que foi bipado na obra
+    cur.execute("""
+        SELECT codigo_qr, COUNT(*) AS recebido
         FROM recebimento_obra
         GROUP BY codigo_qr
     """)
-    estoque = cur.fetchall()
-    estoque_dict = {codigo: qtd for codigo, qtd in estoque}
-
-    cur.execute("""
-        SELECT codigo_qr, COUNT(*) AS demanda
-        FROM registros_qr
-        GROUP BY codigo_qr
-    """)
-    demandas = cur.fetchall()
+    recebidos = cur.fetchall()
+    recebidos_dict = {codigo: qtd for codigo, qtd in recebidos}
 
     relatorio = []
-    for codigo_qr, demanda in demandas:
-        disponivel = estoque_dict.get(codigo_qr, 0)
-        atendido = min(demanda, disponivel)
-        faltando = demanda - atendido
-        if demanda > 0:
-            relatorio.append({
-                "cod_insumo": codigo_qr,
-                "produto": "",  # pode preencher se quiser via JOIN no futuro
-                "obra": "",
-                "cargas": "",
-                "total_necessario": demanda,
-                "bipado": atendido,
-                "faltando": faltando
-            })
+    for codigo_qr, produto, obra, cod_insumo, necessario in entregues:
+        recebido = recebidos_dict.get(codigo_qr, 0)
+        atendido = min(necessario, recebido)
+        faltando = necessario - atendido
+        relatorio.append({
+            "cod_insumo": cod_insumo,
+            "produto": produto,
+            "obra": obra,
+            "estoque": recebido,
+            "necessario": necessario,
+            "atendido": atendido,
+            "faltando": faltando
+        })
 
     cur.close()
     conn.close()
     return jsonify(relatorio)
+
 @app.route('/relatorio_obra_final')
 def relatorio_obra_final():
     conn = get_db_connection()
