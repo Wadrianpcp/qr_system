@@ -60,7 +60,7 @@
   </div>
 
   <div id="resumo">
-    <p>Total Bipado: <span id="resumoBipado">0</span> | Total de Itens: <span id="resumoTotal">0</span></p>
+    <p>Total Entregue (Bipado): <span id="resumoBipado">0</span> | Total de Itens: <span id="resumoTotal">0</span></p>
   </div>
 
   <div class="btn-container">
@@ -74,13 +74,12 @@
         <th>PRODUTO</th>
         <th>OBRA</th>
         <th>CARGAS</th>
-        <th>TOTAL NECESSÁRIO</th>
-        <th>BIPADO</th>
+        <th>TOTAL NECESSÁRIO</th> <!-- agora é o bipado -->
         <th>FALTANDO</th>
       </tr>
     </thead>
     <tbody id="tabelaRelatorio">
-      <tr><td colspan="7">Carregando dados...</td></tr>
+      <tr><td colspan="6">Carregando dados...</td></tr>
     </tbody>
   </table>
 
@@ -91,12 +90,12 @@
       fetch('/relatorio_diferencas')
         .then(res => res.json())
         .then(data => {
-          dadosGlobais = data.filter(item => item.bipado > 0); // Apenas bipados
+          dadosGlobais = data.filter(item => item.bipado > 0);
           preencherFiltros(dadosGlobais);
           renderizarTabela(dadosGlobais);
         })
         .catch(() => {
-          document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Erro ao carregar dados.</td></tr>';
+          document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="6">Erro ao carregar dados.</td></tr>';
         });
     }
 
@@ -136,7 +135,7 @@
       );
 
       if (filtrado.length === 0) {
-        tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
+        tabela.innerHTML = '<tr><td colspan="6">Nenhum dado encontrado.</td></tr>';
         return;
       }
 
@@ -148,8 +147,7 @@
           <td>${item.produto}</td>
           <td>${item.obra}</td>
           <td>${item.cargas}</td>
-          <td>${item.total_necessario}</td>
-          <td>${item.bipado}</td>
+          <td>${item.bipado}</td> <!-- Exibe bipado como "TOTAL NECESSÁRIO" -->
           <td>${item.faltando}</td>
         `;
         tabela.appendChild(row);
