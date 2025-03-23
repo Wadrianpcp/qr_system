@@ -2,24 +2,28 @@
 <html lang="pt">
 <head>
   <meta charset="UTF-8">
-  <title>Relatório de Obra (Bipados)</title>
+  <title>Relatório Final da Obra</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     body {
       font-family: 'Roboto', sans-serif;
-      margin: 20px;
+      background-color: #f9f9f9;
+      padding: 20px;
       text-align: center;
     }
+    h1 {
+      color: #333;
+    }
     #filtros {
-      margin-bottom: 20px;
+      margin: 20px 0;
     }
     select {
-      padding: 6px;
+      padding: 8px;
       margin: 0 10px;
       font-size: 14px;
     }
     #resumo {
-      margin-bottom: 20px;
+      margin: 20px 0;
       font-weight: bold;
     }
     table {
@@ -29,26 +33,23 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     th, td {
+      padding: 10px;
       border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
+      background-color: white;
     }
     th {
       background-color: #e0e0e0;
     }
-    .btn-container {
-      margin-top: 20px;
-    }
     button {
       padding: 10px 20px;
-      margin: 5px;
-      cursor: pointer;
+      margin: 10px;
       font-weight: bold;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <h1>Relatório de Obra (Bipados)</h1>
+  <h1>Relatório Final da Obra</h1>
 
   <div id="filtros">
     <label>Obra:
@@ -60,26 +61,25 @@
   </div>
 
   <div id="resumo">
-    <p>Total Entregue (Bipado): <span id="resumoBipado">0</span> | Total de Itens: <span id="resumoTotal">0</span></p>
+    <p>Itens Atendidos: <span id="atendidos">0</span> | Itens com Falta: <span id="faltando">0</span> | Total de Itens: <span id="totalItens">0</span></p>
   </div>
 
-  <div class="btn-container">
-    <button onclick="window.location.href='/'">Voltar</button>
-  </div>
+  <button onclick="window.location.href='/'">Voltar</button>
 
   <table>
     <thead>
       <tr>
-        <th>COD INSUMO</th>
-        <th>PRODUTO</th>
-        <th>OBRA</th>
-        <th>CARGAS</th>
-        <th>TOTAL NECESSÁRIO</th> <!-- agora é o bipado -->
-        <th>FALTANDO</th>
+        <th>Código</th>
+        <th>Produto</th>
+        <th>Obra</th>
+        <th>Estoque</th>
+        <th>Necessário</th>
+        <th>Atendido</th>
+        <th>Faltando</th>
       </tr>
     </thead>
     <tbody id="tabelaRelatorio">
-      <tr><td colspan="6">Carregando dados...</td></tr>
+      <tr><td colspan="7">Carregando dados...</td></tr>
     </tbody>
   </table>
 
@@ -87,15 +87,15 @@
     let dadosGlobais = [];
 
     function carregarRelatorio() {
-      fetch('/relatorio_diferencas')
+      fetch('/relatorio_obra_final')
         .then(res => res.json())
         .then(data => {
-          dadosGlobais = data.filter(item => item.bipado > 0);
-          preencherFiltros(dadosGlobais);
-          renderizarTabela(dadosGlobais);
+          dadosGlobais = data;
+          preencherFiltros(data);
+          renderizarTabela();
         })
         .catch(() => {
-          document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="6">Erro ao carregar dados.</td></tr>';
+          document.getElementById('tabelaRelatorio').innerHTML = "<tr><td colspan='7'>Erro ao carregar dados.</td></tr>";
         });
     }
 
@@ -103,62 +103,66 @@
       const obras = [...new Set(data.map(d => d.obra))];
       const produtos = [...new Set(data.map(d => d.produto))];
 
-      const obraSelect = document.getElementById('filtroObra');
-      const produtoSelect = document.getElementById('filtroProduto');
+      const selObra = document.getElementById('filtroObra');
+      const selProd = document.getElementById('filtroProduto');
 
       obras.forEach(obra => {
         const opt = document.createElement('option');
         opt.value = obra;
         opt.textContent = obra;
-        obraSelect.appendChild(opt);
+        selObra.appendChild(opt);
       });
 
       produtos.forEach(prod => {
         const opt = document.createElement('option');
         opt.value = prod;
         opt.textContent = prod;
-        produtoSelect.appendChild(opt);
+        selProd.appendChild(opt);
       });
     }
 
-    function renderizarTabela(data) {
+    function renderizarTabela() {
       const filtroObra = document.getElementById('filtroObra').value;
       const filtroProduto = document.getElementById('filtroProduto').value;
+
       const tabela = document.getElementById('tabelaRelatorio');
-      tabela.innerHTML = '';
+      tabela.innerHTML = "";
 
-      let totalBipado = 0;
-
-      const filtrado = data.filter(item =>
+      const filtrado = dadosGlobais.filter(item =>
         (!filtroObra || item.obra === filtroObra) &&
         (!filtroProduto || item.produto === filtroProduto)
       );
 
       if (filtrado.length === 0) {
-        tabela.innerHTML = '<tr><td colspan="6">Nenhum dado encontrado.</td></tr>';
+        tabela.innerHTML = "<tr><td colspan='7'>Nenhum dado encontrado.</td></tr>";
         return;
       }
 
+      let atendidos = 0, faltando = 0;
+
       filtrado.forEach(item => {
-        totalBipado += item.bipado;
-        const row = document.createElement('tr');
+        const row = document.createElement("tr");
         row.innerHTML = `
           <td>${item.cod_insumo}</td>
           <td>${item.produto}</td>
           <td>${item.obra}</td>
-          <td>${item.cargas}</td>
-          <td>${item.bipado}</td> <!-- Exibe bipado como "TOTAL NECESSÁRIO" -->
+          <td>${item.estoque}</td>
+          <td>${item.necessario}</td>
+          <td>${item.atendido}</td>
           <td>${item.faltando}</td>
         `;
         tabela.appendChild(row);
+        if (item.faltando > 0) faltando++;
+        else atendidos++;
       });
 
-      document.getElementById('resumoBipado').textContent = totalBipado;
-      document.getElementById('resumoTotal').textContent = filtrado.length;
+      document.getElementById('atendidos').textContent = atendidos;
+      document.getElementById('faltando').textContent = faltando;
+      document.getElementById('totalItens').textContent = filtrado.length;
     }
 
-    document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
-    document.getElementById('filtroProduto').addEventListener('change', () => renderizarTabela(dadosGlobais));
+    document.getElementById('filtroObra').addEventListener('change', renderizarTabela);
+    document.getElementById('filtroProduto').addEventListener('change', renderizarTabela);
 
     carregarRelatorio();
   </script>
