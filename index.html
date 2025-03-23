@@ -6,29 +6,20 @@
   <title>Registro de QR Code</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
     body {
       font-family: 'Roboto', sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f4f6f8;
-      color: #333;
+      background-color: #f9f9f9;
     }
 
-    header {
-      background-color: #1976d2;
-      color: white;
+    .container {
       padding: 20px;
       text-align: center;
     }
 
-    .container {
-      max-width: 900px;
-      margin: auto;
-      padding: 20px;
+    h1 {
+      color: #333;
     }
 
     .top-bar {
@@ -52,8 +43,8 @@
       background-color: #1976d2;
       color: white;
       border: none;
-      border-radius: 5px;
       cursor: pointer;
+      border-radius: 5px;
     }
 
     button:hover {
@@ -61,10 +52,9 @@
     }
 
     #mensagem {
-      margin-top: 15px;
+      margin: 10px;
       font-weight: bold;
       color: green;
-      text-align: center;
     }
 
     #display {
@@ -75,7 +65,7 @@
       height: 100vh;
       background-color: black;
       color: limegreen;
-      font-size: 6vw;
+      font-size: 5vw;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -92,14 +82,21 @@
       list-style: none;
       padding: 0;
       max-width: 500px;
-      margin: auto;
+      margin: 0 auto;
     }
 
     #historico li {
-      background: #e0e0e0;
+      background: #eee;
       margin-bottom: 5px;
       padding: 8px;
       border-radius: 4px;
+    }
+
+    #video-preview {
+      width: 300px;
+      height: auto;
+      margin: 20px auto;
+      display: none;
     }
 
     .slider-container {
@@ -107,29 +104,12 @@
       align-items: center;
       gap: 10px;
     }
-
-    @media (max-width: 600px) {
-      input[type="text"], input[type="range"] {
-        width: 100%;
-      }
-
-      .top-bar {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      button {
-        width: 100%;
-      }
-    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Registro de QR Code</h1>
-  </header>
-
   <div class="container">
+    <h1>Registro de QR Code</h1>
+
     <div class="top-bar">
       <input type="text" id="usuario" placeholder="Seu nome" />
       <input type="text" id="qrInput" placeholder="Escaneie o QR Code" autofocus />
@@ -144,6 +124,7 @@
       <button onclick="window.location.href='/relatorio'">Relatório</button>
     </div>
 
+    <video id="video-preview" autoplay></video>
     <div id="mensagem"></div>
     <div id="display"></div>
 
@@ -156,6 +137,9 @@
   <!-- Sons -->
   <audio id="sucesso" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
   <audio id="erro" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
+
+  <!-- JS Libraries -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
 
   <script>
     const qrInput = document.getElementById("qrInput");
@@ -215,47 +199,74 @@
 
     qrInput.addEventListener("keypress", function (event) {
       if (event.key === "Enter") {
-        const codigo_qr = qrInput.value.trim();
-        const usuario = document.getElementById("usuario").value.trim();
-        const tempo = parseInt(document.getElementById("tempoExibicao").value);
-
-        if (!codigo_qr || !usuario) {
-          alert("Preencha o nome e o QR Code!");
-          return;
-        }
-
-        exibirDisplay(codigo_qr, tempo);
-
-        fetch("/registrar_qr", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ codigo_qr, usuario })
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.mensagem) {
-            document.getElementById("mensagem").textContent = data.mensagem;
-            sucessoAudio.play();
-            atualizarHistorico(codigo_qr);
-          } else {
-            erroAudio.play();
-            document.getElementById("mensagem").textContent = data.erro || "Erro ao registrar.";
-          }
-        })
-        .catch(() => {
-          erroAudio.play();
-          document.getElementById("mensagem").textContent = "Sem conexão. Salvando offline.";
-          const offline = JSON.parse(localStorage.getItem("offline_qr")) || [];
-          offline.push({ codigo_qr, usuario });
-          localStorage.setItem("offline_qr", JSON.stringify(offline));
-        });
-
+        processarQR(qrInput.value.trim());
         qrInput.value = "";
       }
     });
 
-    renderizarHistorico();
-    sincronizarOffline();
+    function processarQR(codigo_qr) {
+      const usuario = document.getElementById("usuario").value.trim();
+      const tempo = parseInt(document.getElementById("tempoExibicao").value);
+
+      if (!codigo_qr || !usuario) {
+        alert("Preencha o nome e o QR Code!");
+        return;
+      }
+
+      if (historico.includes(codigo_qr)) {
+        erroAudio.play();
+        document.getElementById("mensagem").textContent = "Este QR Code já foi bipado.";
+        return;
+      }
+
+      exibirDisplay(codigo_qr, tempo);
+
+      fetch("/registrar_qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo_qr, usuario })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.mensagem) {
+          document.getElementById("mensagem").textContent = data.mensagem;
+          sucessoAudio.play();
+          atualizarHistorico(codigo_qr);
+        } else {
+          erroAudio.play();
+          document.getElementById("mensagem").textContent = data.erro || "Erro ao registrar.";
+        }
+      })
+      .catch(() => {
+        erroAudio.play();
+        document.getElementById("mensagem").textContent = "Sem conexão. Salvando offline.";
+        const offline = JSON.parse(localStorage.getItem("offline_qr")) || [];
+        offline.push({ codigo_qr, usuario });
+        localStorage.setItem("offline_qr", JSON.stringify(offline));
+      });
+    }
+
+    function iniciarLeitorCamera() {
+      const videoEl = document.getElementById("video-preview");
+      videoEl.style.display = "block";
+
+      const qrScanner = new Html5Qrcode("video-preview");
+      qrScanner.start({ facingMode: "environment" }, {
+        fps: 10,
+        qrbox: 250
+      }, (decodedText) => {
+        qrScanner.stop();
+        videoEl.style.display = "none";
+        processarQR(decodedText);
+      });
+    }
+
+    // Ativa a leitura de QR automaticamente
+    window.onload = function () {
+      renderizarHistorico();
+      sincronizarOffline();
+      iniciarLeitorCamera();
+    };
   </script>
 </body>
 </html>
