@@ -224,36 +224,46 @@ def relatorio_obra_dados():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Buscar os itens bipados na etapa de atendimento da carga
-    cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
-    enviados = dict(cur.fetchall())
+    try:
+        # Busca os códigos bipados no envio (fábrica)
+        cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
+        enviados = dict(cur.fetchall())
 
-    # Buscar os dados da lista de carga
-    cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
-    lista = cur.fetchall()
+        # Busca os dados da lista de carga
+        cur.execute("SELECT cod_insumo, produto, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
+        lista_carga = cur.fetchall()
 
-    relatorio = []
+        # Busca os bipados na obra (recebimento_obra)
+        cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
+        recebidos_obra = dict(cur.fetchall())
 
-    for linha in lista:
-        cod_insumo, produto, uhs, obra, cargas, total, pav = linha
-        total = int(total)
-        bipado_disponivel = enviados.get(cod_insumo, 0)
-        if bipado_disponivel > 0:
-            atendido = min(bipado_disponivel, total)
-            faltando = total - atendido
-            relatorio.append({
-                "cod_insumo": cod_insumo,
-                "produto": produto,
-                "obra": obra,
-                "cargas": cargas,
-                "total_necessario": total,
-                "bipado": atendido,
-                "faltando": faltando
-            })
+        relatorio = []
 
-    cur.close()
-    conn.close()
-    return jsonify(relatorio)
+        for linha in lista_carga:
+            cod_insumo, produto, obra, cargas, total, pav = linha
+            total = int(total)
+            bipado_envio = enviados.get(cod_insumo, 0)
+
+            if bipado_envio > 0:
+                bipado_recebido = recebidos_obra.get(cod_insumo, 0)
+                faltando = max(total - bipado_recebido, 0)
+                relatorio.append({
+                    "cod_insumo": cod_insumo,
+                    "produto": produto,
+                    "obra": obra,
+                    "cargas": cargas,
+                    "total_necessario": total,
+                    "bipado": bipado_recebido,
+                    "faltando": faltando
+                })
+
+        return jsonify(relatorio)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 
 
 if __name__ == '__main__':
