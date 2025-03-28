@@ -87,7 +87,7 @@
     let dadosGlobais = [];
 
     function carregarRelatorio() {
-      fetch('/listar_qr_obra')
+      fetch('/relatorio_obra_dados')
         .then(res => res.json())
         .then(data => {
           dadosGlobais = data;
