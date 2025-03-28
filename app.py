@@ -224,42 +224,40 @@ def relatorio_obra_dados():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # 1. Consulta os dados enviados da fábrica (relatório original)
+    # Consulta os registros bipados na fábrica (apenas códigos enviados)
     cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
     enviados = dict(cur.fetchall())
 
-    # 2. Consulta os dados da lista de carga
-    cur.execute("SELECT cod_insumo, produto, obra, cargas, total FROM lista_de_carga ORDER BY obra, cod_insumo")
-    lista = cur.fetchall()
-
-    # 3. Consulta os dados recebidos na obra
+    # Consulta os registros recebidos na obra
     cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
     recebidos = dict(cur.fetchall())
 
+    # Consulta os detalhes da lista de carga
+    cur.execute("SELECT cod_insumo, produto, obra, cargas, total FROM lista_de_carga")
+    lista = cur.fetchall()
+
     relatorio = []
+
     for cod_insumo, produto, obra, cargas, total in lista:
-        total = int(total)
         enviado = enviados.get(cod_insumo, 0)
 
+        # Só inclui no relatório se foi bipado na fábrica
         if enviado > 0:
             recebido = recebidos.get(cod_insumo, 0)
-            atendido = min(enviado, total)
-            faltando = atendido - recebido
-
             relatorio.append({
                 "cod_insumo": cod_insumo,
                 "produto": produto,
                 "obra": obra,
                 "cargas": cargas,
-                "total_necessario": atendido,
-                "bipado": recebido,
-                "faltando": faltando
+                "total_necessario": enviado,  # O que foi enviado da fábrica
+                "bipado": recebido,           # O que foi bipado na obra
+                "faltando": max(enviado - recebido, 0)
             })
 
     cur.close()
     conn.close()
-
     return jsonify(relatorio)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
