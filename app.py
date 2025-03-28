@@ -225,35 +225,37 @@ def relatorio_obra_dados():
     cur = conn.cursor()
 
     try:
-        # Busca os códigos bipados no envio (fábrica)
-        cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
-        enviados = dict(cur.fetchall())
+        # Consulta os itens bipados na obra
+        cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM recebimento_obra GROUP BY codigo_qr")
+        bipados_obra = cur.fetchall()
+        bipados_obra_dict = {codigo: qtd for codigo, qtd in bipados_obra}
 
-        # Busca os dados da lista de carga
-        cur.execute("SELECT cod_insumo, produto, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
-        lista_carga = cur.fetchall()
+        # Consulta os itens bipados na carga (que foram realmente enviados)
+        cur.execute("SELECT codigo_qr, COUNT(*) AS enviados FROM registros_qr GROUP BY codigo_qr")
+        enviados = cur.fetchall()
+        enviados_dict = {codigo: qtd for codigo, qtd in enviados}
 
-        # Busca os bipados na obra (recebimento_obra)
-        cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
-        recebidos_obra = dict(cur.fetchall())
+        # Pega a lista da carga original
+        cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
+        lista = cur.fetchall()
 
         relatorio = []
+        for linha in lista:
+            cod_insumo, produto, uhs, obra, cargas, total, pav = linha
 
-        for linha in lista_carga:
-            cod_insumo, produto, obra, cargas, total, pav = linha
-            total = int(total)
-            bipado_envio = enviados.get(cod_insumo, 0)
+            # Só entra no relatório se foi realmente enviado (bipado na carga)
+            if cod_insumo in enviados_dict:
+                total = int(total)
+                bipado = bipados_obra_dict.get(cod_insumo, 0)
+                faltando = max(total - bipado, 0)
 
-            if bipado_envio > 0:
-                bipado_recebido = recebidos_obra.get(cod_insumo, 0)
-                faltando = max(total - bipado_recebido, 0)
                 relatorio.append({
                     "cod_insumo": cod_insumo,
                     "produto": produto,
                     "obra": obra,
                     "cargas": cargas,
                     "total_necessario": total,
-                    "bipado": bipado_recebido,
+                    "bipado": bipado,
                     "faltando": faltando
                 })
 
@@ -263,7 +265,6 @@ def relatorio_obra_dados():
     finally:
         cur.close()
         conn.close()
-
 
 
 if __name__ == '__main__':
