@@ -219,5 +219,46 @@ def excluir_qr_obra(id):
         cur.close()
         conn.close()
 
+@app.route('/relatorio_obra_dados', methods=['GET'])
+def relatorio_obra_dados():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # 1. Coleta os bipados na fábrica (envio)
+    cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
+    bipados_fabrica = dict(cur.fetchall())
+
+    # 2. Coleta os bipados na obra (recebimento)
+    cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
+    bipados_obra = dict(cur.fetchall())
+
+    # 3. Coleta lista de carga
+    cur.execute("SELECT cod_insumo, produto, obra, cargas, total FROM lista_de_carga ORDER BY obra, cod_insumo")
+    lista = cur.fetchall()
+
+    relatorio = []
+
+    for cod_insumo, produto, obra, cargas, total in lista:
+        enviado = bipados_fabrica.get(cod_insumo, 0)
+        if enviado == 0:
+            continue  # Só mostra se foi enviado para a obra
+
+        recebido = bipados_obra.get(cod_insumo, 0)
+        faltando = enviado - recebido
+
+        relatorio.append({
+            "cod_insumo": cod_insumo,
+            "produto": produto,
+            "obra": obra,
+            "cargas": cargas,
+            "total_necessario": enviado,
+            "bipado": recebido,
+            "faltando": faltando
+        })
+
+    cur.close()
+    conn.close()
+    return jsonify(relatorio)
+
 if __name__ == '__main__':
     app.run(debug=True)
