@@ -27,6 +27,10 @@ def registros():
 def registros_obra():
     return send_file('registros_obra.html')
 
+@app.route('/relatorio_obra')
+def relatorio_obra():
+    return send_file('relatorio_obra.html')
+
 @app.route('/importar')
 def importar_lista():
     return send_file('upload.html')
