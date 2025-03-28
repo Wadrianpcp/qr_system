@@ -201,6 +201,19 @@ def relatorio_diferencas():
     conn.close()
 
     return jsonify(relatorio)
+@app.route('/excluir_qr_obra/<int:id>', methods=['DELETE'])
+def excluir_qr_obra(id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM recebimento_obra WHERE id = %s", (id,))
+        conn.commit()
+        return jsonify({"sucesso": True})
+    except Exception as e:
+        return jsonify({"sucesso": False, "erro": str(e)})
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == '__main__':
     app.run(debug=True)
