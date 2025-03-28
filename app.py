@@ -16,16 +16,16 @@ def index():
     return send_file('index.html')
 
 @app.route('/obra')
-def index():
-    return send_file('registros_obra.html')
-
-@app.route('/obra')
 def obra():
     return send_file('obra.html')
 
 @app.route('/registros')
 def registros():
     return send_file('registros.html')
+
+@app.route('/registros_obra')
+def registros_obra():
+    return send_file('registros_obra.html')
 
 @app.route('/importar')
 def importar_lista():
