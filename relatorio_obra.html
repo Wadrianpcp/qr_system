@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -90,8 +91,8 @@
       fetch('/relatorio_obra_dados')
         .then(res => res.json())
         .then(data => {
-          dadosGlobais = data;
-          preencherFiltros(data);
+          dadosGlobais = data.filter(item => parseInt(item.bipado) > 0);  // Somente os que foram bipados
+          preencherFiltros(dadosGlobais);
           renderizarTabela();
         })
         .catch(() => {
