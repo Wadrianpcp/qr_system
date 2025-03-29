@@ -225,53 +225,41 @@ def relatorio_obra_dados():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # 1. Itens bipados na carga (registro_qr) agrupados por código
-        cur.execute("""
-            SELECT codigo_qr, COUNT(*) as bipado
-            FROM registros_qr
-            GROUP BY codigo_qr
-        """)
-        carga_bipados = dict(cur.fetchall())  # Ex: {"850.96.00011210": 1}
+        # Etapa 1: buscar QR Codes bipados na carga
+        cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
+        carga_bipados = cur.fetchall()
+        carga_dict = {r[0]: r[1] for r in carga_bipados}  # {codigo_qr: qtd_bipado}
 
-        # 2. Itens bipados na obra (recebimento_obra)
+        # Etapa 2: buscar registros da obra (recebimento_obra)
         cur.execute("""
-            SELECT codigo_qr, COUNT(*) as recebidos
-            FROM recebimento_obra
-            GROUP BY codigo_qr
+            SELECT codigo_qr, produto, obra, cargas, COUNT(*) 
+            FROM recebimento_obra 
+            GROUP BY codigo_qr, produto, obra, cargas
         """)
-        obra_bipados = dict(cur.fetchall())  # Ex: {"850.96.00011210": 1}
-
-        # 3. Pega os dados da carga (lista_de_carga)
-        cur.execute("""
-            SELECT cod_insumo, produto, obra, cargas, total
-            FROM lista_de_carga
-        """)
-        lista_carga = cur.fetchall()
+        obra_registros = cur.fetchall()
 
         resultado = []
 
-        for cod_insumo, produto, obra, cargas, total in lista_carga:
-            bipado_carga = carga_bipados.get(cod_insumo, 0)
-            if bipado_carga == 0:
-                continue  # Só entra no relatório se foi bipado na carga
+        for codigo_qr, produto, obra, cargas, qtd_obra in obra_registros:
+            # Verifica se esse código também foi bipado na carga
+            bipado_carga = carga_dict.get(codigo_qr, 0)
+            if bipado_carga > 0:
+                atendido = min(bipado_carga, qtd_obra)
+                faltando = qtd_obra - atendido
 
-            bipado_obra = obra_bipados.get(cod_insumo, 0)
-            faltando = max(bipado_carga - bipado_obra, 0)
-
-            resultado.append({
-                "cod_insumo": cod_insumo,
-                "produto": produto,
-                "obra": obra,
-                "cargas": cargas,
-                "total_necessario": bipado_carga,
-                "bipado": bipado_obra,
-                "faltando": faltando
-            })
+                resultado.append({
+                    "cod_insumo": codigo_qr,
+                    "produto": produto,
+                    "obra": obra,
+                    "cargas": cargas,
+                    "total_necessario": qtd_obra,
+                    "bipado": atendido,
+                    "faltando": faltando
+                })
 
         cur.close()
         conn.close()
         return jsonify(resultado)
-
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
