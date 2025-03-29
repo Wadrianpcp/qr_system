@@ -225,34 +225,37 @@ def relatorio_obra_dados():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Etapa 1: buscar QR Codes bipados na carga
+        # QR codes bipados na carga
         cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
         carga_bipados = cur.fetchall()
-        carga_dict = {r[0]: r[1] for r in carga_bipados}  # {codigo_qr: qtd_bipado}
+        carga_dict = {r[0]: r[1] for r in carga_bipados}
 
-        # Etapa 2: buscar registros da obra (recebimento_obra)
-        cur.execute("""
-            SELECT codigo_qr, produto, obra, cargas, COUNT(*) 
-            FROM recebimento_obra 
-            GROUP BY codigo_qr, produto, obra, cargas
-        """)
-        obra_registros = cur.fetchall()
+        # QR codes bipados na obra
+        cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
+        obra_bipados = cur.fetchall()
+        obra_dict = {r[0]: r[1] for r in obra_bipados}
+
+        # Dados da lista de carga (para complementar as informações)
+        cur.execute("SELECT cod_insumo, produto, obra, cargas, total FROM lista_de_carga")
+        carga_detalhes = cur.fetchall()
 
         resultado = []
 
-        for codigo_qr, produto, obra, cargas, qtd_obra in obra_registros:
-            # Verifica se esse código também foi bipado na carga
-            bipado_carga = carga_dict.get(codigo_qr, 0)
+        for cod_insumo, produto, obra, cargas, total in carga_detalhes:
+            total = int(total)
+            bipado_carga = carga_dict.get(cod_insumo, 0)
+            bipado_obra = obra_dict.get(cod_insumo, 0)
+
             if bipado_carga > 0:
-                atendido = min(bipado_carga, qtd_obra)
-                faltando = qtd_obra - atendido
+                atendido = min(bipado_obra, total)
+                faltando = total - atendido
 
                 resultado.append({
-                    "cod_insumo": codigo_qr,
+                    "cod_insumo": cod_insumo,
                     "produto": produto,
                     "obra": obra,
                     "cargas": cargas,
-                    "total_necessario": qtd_obra,
+                    "total_necessario": total,
                     "bipado": atendido,
                     "faltando": faltando
                 })
