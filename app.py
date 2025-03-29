@@ -222,49 +222,59 @@ def excluir_qr_obra(id):
 @app.route('/relatorio_obra_dados')
 def relatorio_obra_dados():
     try:
-        conn = conectar()
+        conn = get_db_connection()
         cur = conn.cursor()
 
-        # Pegar todos os códigos que foram realmente bipados na carga (atendidos)
+        # 1. Itens bipados na carga (registro_qr) agrupados por código
         cur.execute("""
             SELECT codigo_qr, COUNT(*) as bipado
             FROM registros_qr
             GROUP BY codigo_qr
         """)
-        registros_carga = cur.fetchall()
-        carga_dict = {r[0]: r[1] for r in registros_carga}  # {'codigo_qr': bipado}
+        carga_bipados = dict(cur.fetchall())  # Ex: {"850.96.00011210": 1}
 
-        # Pegar todos os registros da tabela de recebimento (obra)
+        # 2. Itens bipados na obra (recebimento_obra)
         cur.execute("""
-            SELECT codigo_qr, produto, obra, cargas, COUNT(*) as total_necessario
+            SELECT codigo_qr, COUNT(*) as recebidos
             FROM recebimento_obra
-            GROUP BY codigo_qr, produto, obra, cargas
+            GROUP BY codigo_qr
         """)
-        registros_obra = cur.fetchall()
+        obra_bipados = dict(cur.fetchall())  # Ex: {"850.96.00011210": 1}
+
+        # 3. Pega os dados da carga (lista_de_carga)
+        cur.execute("""
+            SELECT cod_insumo, produto, obra, cargas, total
+            FROM lista_de_carga
+        """)
+        lista_carga = cur.fetchall()
 
         resultado = []
-        for linha in registros_obra:
-            codigo, produto, obra, cargas, total_necessario = linha
-            bipado = carga_dict.get(codigo, 0)
 
-            # Só adiciona ao relatório se esse código foi bipado na carga
-            if bipado > 0:
-                faltando = max(total_necessario - bipado, 0)
-                resultado.append({
-                    "cod_insumo": codigo,
-                    "produto": produto,
-                    "obra": obra,
-                    "cargas": cargas,
-                    "total_necessario": total_necessario,
-                    "bipado": bipado,
-                    "faltando": faltando
-                })
+        for cod_insumo, produto, obra, cargas, total in lista_carga:
+            bipado_carga = carga_bipados.get(cod_insumo, 0)
+            if bipado_carga == 0:
+                continue  # Só entra no relatório se foi bipado na carga
+
+            bipado_obra = obra_bipados.get(cod_insumo, 0)
+            faltando = max(bipado_carga - bipado_obra, 0)
+
+            resultado.append({
+                "cod_insumo": cod_insumo,
+                "produto": produto,
+                "obra": obra,
+                "cargas": cargas,
+                "total_necessario": bipado_carga,
+                "bipado": bipado_obra,
+                "faltando": faltando
+            })
 
         cur.close()
         conn.close()
         return jsonify(resultado)
+
     except Exception as e:
-        return jsonify([]), 500
+        return jsonify({"erro": str(e)}), 500
+
 
 @app.route('/registrar_qr_obra', methods=['POST'])
 def registrar_qr_obra():
