@@ -205,10 +205,7 @@ def relatorio_diferencas():
         })
 
     cur.close()
-    conn.close()
-    return jsonify(relatorio)
-
-    
+    conn.close()    
     return jsonify(relatorio)
 @app.route('/excluir_qr_obra/<int:id>', methods=['DELETE'])
 def excluir_qr_obra(id):
