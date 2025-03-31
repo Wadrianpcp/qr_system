@@ -175,15 +175,10 @@ def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Bipagens feitas na FÁBRICA (registros_qr)
-    cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
-    bipado_fabrica_dict = dict(cur.fetchall())
+    cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM registros_qr GROUP BY codigo_qr")
+    bipados = cur.fetchall()
+    bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    # Bipagens feitas na OBRA (recebimento_obra)
-    cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
-    bipado_obra_dict = dict(cur.fetchall())
-
-    # Lista de carga
     cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
     lista = cur.fetchall()
     relatorio = []
@@ -191,8 +186,10 @@ def relatorio_diferencas():
     for linha in lista:
         cod_insumo, produto, uhs, obra, cargas, total, pav = linha
         total = int(total)
-        bipado_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
-        bipado_obra = bipado_obra_dict.get(cod_insumo, 0)
+        bipado_disponivel = bipados_dict.get(cod_insumo, 0)
+        atendido = min(bipado_disponivel, total)
+        faltando = total - atendido
+        bipados_dict[cod_insumo] = bipado_disponivel - atendido
 
         relatorio.append({
             "cod_insumo": cod_insumo,
@@ -200,12 +197,13 @@ def relatorio_diferencas():
             "obra": obra,
             "cargas": cargas,
             "total_necessario": total,
-            "bipado_fabrica": bipado_fabrica,
-            "bipado_obra": bipado_obra
+            "bipado": atendido,
+            "faltando": faltando
         })
 
     cur.close()
-    conn.close()    
+    conn.close()
+
     return jsonify(relatorio)
 @app.route('/excluir_qr_obra/<int:id>', methods=['DELETE'])
 def excluir_qr_obra(id):
@@ -221,74 +219,53 @@ def excluir_qr_obra(id):
         cur.close()
         conn.close()
 
-@app.route('/relatorio_obra_dados')
+@app.route('/relatorio_obra_dados', methods=['GET'])
 def relatorio_obra_dados():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
     try:
-        conn = get_db_connection()
-        cur = conn.cursor()
+        # Consulta os itens bipados na obra
+        cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM recebimento_obra GROUP BY codigo_qr")
+        bipados_obra = cur.fetchall()
+        bipados_obra_dict = {codigo: qtd for codigo, qtd in bipados_obra}
 
-        # QR codes bipados na carga
-        cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
-        carga_bipados = cur.fetchall()
-        carga_dict = {r[0]: r[1] for r in carga_bipados}
+        # Consulta os itens bipados na carga (que foram realmente enviados)
+        cur.execute("SELECT codigo_qr, COUNT(*) AS enviados FROM registros_qr GROUP BY codigo_qr")
+        enviados = cur.fetchall()
+        enviados_dict = {codigo: qtd for codigo, qtd in enviados}
 
-        # QR codes bipados na obra
-        cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
-        obra_bipados = cur.fetchall()
-        obra_dict = {r[0]: r[1] for r in obra_bipados}
+        # Pega a lista da carga original
+        cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
+        lista = cur.fetchall()
 
-        # Dados da lista de carga (para complementar as informações)
-        cur.execute("SELECT cod_insumo, produto, obra, cargas, total FROM lista_de_carga")
-        carga_detalhes = cur.fetchall()
+        relatorio = []
+        for linha in lista:
+            cod_insumo, produto, uhs, obra, cargas, total, pav = linha
 
-        resultado = []
+            # Só entra no relatório se foi realmente enviado (bipado na carga)
+            if cod_insumo in enviados_dict:
+                total = int(total)
+                bipado = bipados_obra_dict.get(cod_insumo, 0)
+                faltando = max(total - bipado, 0)
 
-        for cod_insumo, produto, obra, cargas, total in carga_detalhes:
-            total = int(total)
-            bipado_carga = carga_dict.get(cod_insumo, 0)
-            bipado_obra = obra_dict.get(cod_insumo, 0)
-
-            if bipado_carga > 0:
-                atendido = min(bipado_obra, total)
-                faltando = total - atendido
-
-                resultado.append({
+                relatorio.append({
                     "cod_insumo": cod_insumo,
                     "produto": produto,
                     "obra": obra,
                     "cargas": cargas,
                     "total_necessario": total,
-                    "bipado": atendido,
+                    "bipado": bipado,
                     "faltando": faltando
                 })
 
-        cur.close()
-        conn.close()
-        return jsonify(resultado)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-
-
-@app.route('/registrar_qr_obra', methods=['POST'])
-def registrar_qr_obra():
-    data = request.json
-    codigo_qr = data.get('codigo_qr')
-    usuario = data.get('usuario')
-
-    if not codigo_qr or not usuario:
-        return jsonify({"erro": "Código QR e usuário são obrigatórios"}), 400
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("INSERT INTO recebimento_obra (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
-        conn.commit()
-        return jsonify({"mensagem": "QR Code registrado com sucesso na obra!"}), 201
+        return jsonify(relatorio)
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
         conn.close()
+
 
 if __name__ == '__main__':
     app.run(debug=True)
