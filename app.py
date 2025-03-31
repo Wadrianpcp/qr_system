@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 import psycopg2
 import pandas as pd
+from datetime import datetime
 import pytz
 
 app = Flask(__name__)
@@ -117,36 +118,7 @@ def excluir_qr_obra(id):
     conn.close()
     return jsonify({"sucesso": excluidos > 0, "erro": None if excluidos > 0 else "Registro não encontrado."}), 200 if excluidos else 404
 
-# As demais rotas permanecem inalteradas, exceto /relatorio_obra_dados com campos diferenciados:
-
-@app.route('/relatorio_obra_dados', methods=['GET'])
-def relatorio_obra_dados():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
-    bipados_obra = dict(cur.fetchall())
-
-    cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
-    enviados_fabrica = dict(cur.fetchall())
-
-    cur.execute("SELECT cod_insumo, produto, obra, cargas, total FROM lista_de_carga")
-    lista = cur.fetchall()
-
-    relatorio = []
-    for cod_insumo, produto, obra, cargas, total in lista:
-        relatorio.append({
-            "cod_insumo": cod_insumo,
-            "produto": produto,
-            "obra": obra,
-            "cargas": cargas,
-            "total_necessario": total,
-            "bipado_fabrica": enviados_fabrica.get(cod_insumo, 0),
-            "bipado_obra": bipados_obra.get(cod_insumo, 0)
-        })
-
-    cur.close()
-    conn.close()
-    return jsonify(relatorio)
+# Mantenha aqui as demais rotas originais do seu arquivo inicial sem alterações.
 
 if __name__ == '__main__':
     app.run(debug=True)
