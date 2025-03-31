@@ -172,45 +172,39 @@ def listar_carga():
 
 @app.route('/relatorio_diferencas', methods=['GET'])
 def relatorio_diferencas():
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
+    conn = get_db_connection()
+    cur = conn.cursor()
 
-        cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM registros_qr GROUP BY codigo_qr")
-        bipados = cur.fetchall()
-        bipados_dict = {codigo: qtd for codigo, qtd in bipados}
+    cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM registros_qr GROUP BY codigo_qr")
+    bipados = cur.fetchall()
+    bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-        cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
-        lista = cur.fetchall()
-        relatorio = []
+    cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
+    lista = cur.fetchall()
+    relatorio = []
 
-        for linha in lista:
-            cod_insumo, produto, uhs, obra, cargas, total, pav = linha
-            total = int(total)
-            bipado_disponivel = bipados_dict.get(cod_insumo, 0)
-            atendido = min(bipado_disponivel, total)
-            faltando = total - atendido
-            bipados_dict[cod_insumo] = bipado_disponivel - atendido
+    for linha in lista:
+        cod_insumo, produto, uhs, obra, cargas, total, pav = linha
+        total = int(total)
+        bipado_disponivel = bipados_dict.get(cod_insumo, 0)
+        atendido = min(bipado_disponivel, total)
+        faltando = total - atendido
+        bipados_dict[cod_insumo] = bipado_disponivel - atendido
 
-            relatorio.append({
-                "cod_insumo": cod_insumo,
-                "produto": produto,
-                "obra": obra,
-                "cargas": cargas,
-                "total_necessario": total,
-                "bipado": atendido,
-                "faltando": faltando
-            })
+        relatorio.append({
+            "cod_insumo": cod_insumo,
+            "produto": produto,
+            "obra": obra,
+            "cargas": cargas,
+            "total_necessario": total,
+            "bipado": atendido,
+            "faltando": faltando
+        })
 
-        cur.close()
-        conn.close()
+    cur.close()
+    conn.close()
 
-        return jsonify(relatorio)
-
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-
-
+    return jsonify(relatorio)
 @app.route('/excluir_qr_obra/<int:id>', methods=['DELETE'])
 def excluir_qr_obra(id):
     conn = get_db_connection()
@@ -225,53 +219,72 @@ def excluir_qr_obra(id):
         cur.close()
         conn.close()
 
-@app.route('/relatorio_obra_dados', methods=['GET'])
+@app.route('/relatorio_obra_dados')
 def relatorio_obra_dados():
-    conn = get_db_connection()
-    cur = conn.cursor()
-
     try:
-        # Consulta os itens bipados na obra
-        cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM recebimento_obra GROUP BY codigo_qr")
-        bipados_obra = cur.fetchall()
-        bipados_obra_dict = {codigo: qtd for codigo, qtd in bipados_obra}
+        conn = conectar()
+        cur = conn.cursor()
 
-        # Consulta os itens bipados na carga (que foram realmente enviados)
-        cur.execute("SELECT codigo_qr, COUNT(*) AS enviados FROM registros_qr GROUP BY codigo_qr")
-        enviados = cur.fetchall()
-        enviados_dict = {codigo: qtd for codigo, qtd in enviados}
+        # Pegar todos os códigos que foram realmente bipados na carga (atendidos)
+        cur.execute("""
+            SELECT codigo_qr, COUNT(*) as bipado
+            FROM registros_qr
+            GROUP BY codigo_qr
+        """)
+        registros_carga = cur.fetchall()
+        carga_dict = {r[0]: r[1] for r in registros_carga}  # {'codigo_qr': bipado}
 
-        # Pega a lista da carga original
-        cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
-        lista = cur.fetchall()
+        # Pegar todos os registros da tabela de recebimento (obra)
+        cur.execute("""
+            SELECT codigo_qr, produto, obra, cargas, COUNT(*) as total_necessario
+            FROM recebimento_obra
+            GROUP BY codigo_qr, produto, obra, cargas
+        """)
+        registros_obra = cur.fetchall()
 
-        relatorio = []
-        for linha in lista:
-            cod_insumo, produto, uhs, obra, cargas, total, pav = linha
+        resultado = []
+        for linha in registros_obra:
+            codigo, produto, obra, cargas, total_necessario = linha
+            bipado = carga_dict.get(codigo, 0)
 
-            # Só entra no relatório se foi realmente enviado (bipado na carga)
-            if cod_insumo in enviados_dict:
-                total = int(total)
-                bipado = bipados_obra_dict.get(cod_insumo, 0)
-                faltando = max(total - bipado, 0)
-
-                relatorio.append({
-                    "cod_insumo": cod_insumo,
+            # Só adiciona ao relatório se esse código foi bipado na carga
+            if bipado > 0:
+                faltando = max(total_necessario - bipado, 0)
+                resultado.append({
+                    "cod_insumo": codigo,
                     "produto": produto,
                     "obra": obra,
                     "cargas": cargas,
-                    "total_necessario": total,
+                    "total_necessario": total_necessario,
                     "bipado": bipado,
                     "faltando": faltando
                 })
 
-        return jsonify(relatorio)
+        cur.close()
+        conn.close()
+        return jsonify(resultado)
+    except Exception as e:
+        return jsonify([]), 500
+@app.route('/registrar_qr_obra', methods=['POST'])
+def registrar_qr_obra():
+    data = request.json
+    codigo_qr = data.get('codigo_qr')
+    usuario = data.get('usuario')
+
+    if not codigo_qr or not usuario:
+        return jsonify({"erro": "Código QR e usuário são obrigatórios"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO recebimento_obra (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
+        conn.commit()
+        return jsonify({"mensagem": "QR Code registrado com sucesso na obra!"}), 201
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
     finally:
         cur.close()
         conn.close()
-
 
 if __name__ == '__main__':
     app.run(debug=True)
