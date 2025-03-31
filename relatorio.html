@@ -5,107 +5,51 @@
   <title>Relatório de Atendimento da Carga</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: 'Roboto', sans-serif;
-      margin: 20px;
-      text-align: center;
-    }
-    #filtros, #usuarioContainer {
-      margin-bottom: 20px;
-    }
-    select, input[type="text"] {
-      padding: 6px;
-      margin: 0 10px;
-    }
-    #resumo {
-      margin-bottom: 20px;
-      font-weight: bold;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
-    }
-    th {
-      background-color: #f0f0f0;
-    }
-    .status-verde {
-      background-color: #d4edda;
-    }
-    .status-amarelo {
-      background-color: #fff3cd;
-    }
-    .status-vermelho {
-      background-color: #f8d7da;
-    }
-    .btn-container {
-      margin-top: 20px;
-    }
-    button {
-      padding: 10px 20px;
-      margin: 5px;
-      cursor: pointer;
-      font-weight: bold;
-    }
+    body { font-family: 'Roboto', sans-serif; margin: 20px; text-align: center; }
+    #filtros, #usuarioContainer { margin-bottom: 20px; }
+    select, input[type="text"] { padding: 6px; margin: 0 10px; }
+    #resumo { margin-bottom: 20px; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background-color: #f0f0f0; }
+    .status-verde { background-color: #d4edda; }
+    .status-amarelo { background-color: #fff3cd; }
+    .status-vermelho { background-color: #f8d7da; }
+    .btn-container { margin-top: 20px; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; font-weight: bold; }
   </style>
 </head>
 <body>
   <h1>Relatório de Atendimento da Carga</h1>
-
   <div id="usuarioContainer">
-    <label>Usuário:
-      <input type="text" id="nomeUsuario" placeholder="Digite seu nome para exportar">
-    </label>
+    <label>Usuário: <input type="text" id="nomeUsuario" placeholder="Digite seu nome para exportar"></label>
   </div>
-
   <div id="filtros">
-    <label>Obra:
-      <select id="filtroObra"><option value="">Todas</option></select>
-    </label>
-    <label>Produto:
-      <select id="filtroProduto"><option value="">Todos</option></select>
-    </label>
-    <label>Cargas:
-      <select id="filtroCargas"><option value="">Todas</option></select>
-    </label>
-    <label>Status:
-      <select id="filtroStatus">
-        <option value="">Todos</option>
-        <option value="verde">Atendido</option>
-        <option value="amarelo">Parcial</option>
-        <option value="vermelho">Não Atendido</option>
-      </select>
-    </label>
+    <label>Obra: <select id="filtroObra"><option value="">Todas</option></select></label>
+    <label>Produto: <select id="filtroProduto"><option value="">Todos</option></select></label>
+    <label>Cargas: <select id="filtroCargas"><option value="">Todas</option></select></label>
+    <label>Status: <select id="filtroStatus">
+      <option value="">Todos</option>
+      <option value="verde">Atendido</option>
+      <option value="amarelo">Parcial</option>
+      <option value="vermelho">Não Atendido</option>
+    </select></label>
   </div>
-
   <div id="resumo">
     <p>Total Atendidos: <span id="resumoVerde">0</span> |
        Não Atendidos: <span id="resumoVermelho">0</span> |
        Total de Itens: <span id="resumoTotal">0</span></p>
   </div>
-
   <div class="btn-container">
     <button onclick="exportarExcel()">Exportar para Excel</button>
     <button onclick="exportarPDF()">Exportar para PDF</button>
     <button onclick="window.location.href='/'">Voltar</button>
   </div>
-
   <table>
     <thead>
       <tr>
-        <th>COD INSUMO</th>
-        <th>PRODUTO</th>
-        <th>OBRA</th>
-        <th>CARGAS</th>
-        <th>TOTAL NECESSÁRIO</th>
-        <th>BIPADO</th>
-        <th>FALTANDO</th>
+        <th>COD INSUMO</th><th>PRODUTO</th><th>OBRA</th><th>CARGAS</th>
+        <th>TOTAL NECESSÁRIO</th><th>BIPADO FABRICA</th><th>BIPADO OBRA</th>
       </tr>
     </thead>
     <tbody id="tabelaRelatorio">
@@ -113,179 +57,83 @@
     </tbody>
   </table>
 
-  <!-- Bibliotecas para exportação -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-
   <script>
     let dadosGlobais = [];
-
     function carregarRelatorio() {
       fetch('/relatorio_diferencas')
-        .then(res => {
-          if (!res.ok) {
-            throw new Error(`Erro na requisição: ${res.status}`);
-          }
-          return res.json();
-        })
+        .then(res => res.json())
         .then(data => {
-          console.log("✅ Dados recebidos do servidor:", data);
           dadosGlobais = data;
           preencherFiltros(data);
           renderizarTabela(data);
         })
         .catch((erro) => {
-          console.error("❌ Erro ao carregar os dados:", erro);
-          document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro ao carregar dados: ${erro.message}</td></tr>`;
+          document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: ${erro.message}</td></tr>`;
         });
     }
-
     function preencherFiltros(data) {
       const obras = [...new Set(data.map(d => d.obra))];
       const produtos = [...new Set(data.map(d => d.produto))];
       const cargas = [...new Set(data.map(d => d.cargas))];
-
       const obraSelect = document.getElementById('filtroObra');
       const produtoSelect = document.getElementById('filtroProduto');
       const cargasSelect = document.getElementById('filtroCargas');
-
-      obras.forEach(obra => {
-        const opt = document.createElement('option');
-        opt.value = obra;
-        opt.textContent = obra;
-        obraSelect.appendChild(opt);
-      });
-
-      produtos.forEach(prod => {
-        const opt = document.createElement('option');
-        opt.value = prod;
-        opt.textContent = prod;
-        produtoSelect.appendChild(opt);
-      });
-
-      cargas.forEach(carga => {
-        const opt = document.createElement('option');
-        opt.value = carga;
-        opt.textContent = carga;
-        cargasSelect.appendChild(opt);
-      });
+      obras.forEach(o => obraSelect.innerHTML += `<option value="${o}">${o}</option>`);
+      produtos.forEach(p => produtoSelect.innerHTML += `<option value="${p}">${p}</option>`);
+      cargas.forEach(c => cargasSelect.innerHTML += `<option value="${c}">${c}</option>`);
     }
-
     function renderizarTabela(data) {
       const filtroObra = document.getElementById('filtroObra').value;
       const filtroProduto = document.getElementById('filtroProduto').value;
       const filtroCargas = document.getElementById('filtroCargas').value;
       const filtroStatus = document.getElementById('filtroStatus').value;
-
       const tabela = document.getElementById('tabelaRelatorio');
       tabela.innerHTML = '';
-
-      let atendido = 0, parcial = 0, naoAtendido = 0;
-
+      let verde = 0, vermelho = 0;
       const filtrado = data.filter(item => {
         let status;
-        if (item.bipado == 0) status = 'vermelho';
-        else if (item.faltando == 0) status = 'verde';
-        else status = 'amarelo';
-
+        if (item.bipado_fabrica > 0 && item.bipado_obra > 0) status = 'verde';
+        else if (item.bipado_fabrica > 0 && item.bipado_obra == 0) status = 'amarelo';
+        else status = 'vermelho';
         const condObra = !filtroObra || item.obra === filtroObra;
         const condProd = !filtroProduto || item.produto === filtroProduto;
         const condCargas = !filtroCargas || item.cargas === filtroCargas;
         const condStatus = !filtroStatus || status === filtroStatus;
-
         return condObra && condProd && condCargas && condStatus;
       });
-
       if (filtrado.length === 0) {
         tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
         return;
       }
-
       filtrado.forEach(item => {
         let classe = '';
-        if (item.bipado == 0) {
-          classe = 'status-vermelho';
-          naoAtendido++;
-        } else if (item.faltando == 0) {
-          classe = 'status-verde';
-          atendido++;
-        } else {
+        if (item.bipado_fabrica > 0 && item.bipado_obra > 0) {
+          classe = 'status-verde'; verde++;
+        } else if (item.bipado_fabrica > 0 && item.bipado_obra == 0) {
           classe = 'status-amarelo';
-          parcial++;
+        } else {
+          classe = 'status-vermelho'; vermelho++;
         }
-
-        const row = document.createElement('tr');
-        row.className = classe;
-        row.innerHTML = `
-  <td>${item.cod_insumo}</td>
-  <td>${item.produto}</td>
-  <td>${item.obra}</td>
-  <td>${item.cargas}</td>
-  <td>${item.total_necessario}</td>
-  <td>${item.bipado}</td>
-  <td>${item.faltando}</td>
-`;
-        tabela.appendChild(row);
+        tabela.innerHTML += `
+          <tr class="${classe}">
+            <td>${item.cod_insumo}</td>
+            <td>${item.produto}</td>
+            <td>${item.obra}</td>
+            <td>${item.cargas}</td>
+            <td>${item.total_necessario}</td>
+            <td>${item.bipado_fabrica}</td>
+            <td>${item.bipado_obra}</td>
+          </tr>
+        `;
       });
-
-      document.getElementById('resumoVerde').textContent = atendido;
-      document.getElementById('resumoVermelho').textContent = naoAtendido;
+      document.getElementById('resumoVerde').textContent = verde;
+      document.getElementById('resumoVermelho').textContent = vermelho;
       document.getElementById('resumoTotal').textContent = filtrado.length;
     }
-
-    function exportarExcel() {
-      const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
-      const agora = new Date().toLocaleString();
-      const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
-
-      const tabela = document.querySelector("table");
-      const wb = XLSX.utils.table_to_book(tabela, { sheet: "Relatório" });
-
-      const ws = wb.Sheets["Relatório"];
-      const ultimaLinha = XLSX.utils.decode_range(ws['!ref']).e.r + 2;
-      const cellAddress = `A${ultimaLinha}`;
-      ws[cellAddress] = { t: 's', v: rodape };
-      ws['!ref'] = ws['!ref'].replace(/:\w+\d+$/, `:A${ultimaLinha}`);
-
-      XLSX.writeFile(wb, "relatorio_carga.xlsx");
-    }
-
-    function exportarPDF() {
-      const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
-      const agora = new Date().toLocaleString();
-      const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-
-      doc.text("Relatório de Atendimento da Carga", 14, 15);
-
-      const headers = [["COD INSUMO", "PRODUTO", "OBRA", "CARGAS", "TOTAL", "BIPADO", "FALTANDO"]];
-      const body = [];
-
-      document.querySelectorAll("#tabelaRelatorio tr").forEach(row => {
-        const cells = Array.from(row.children).map(td => td.textContent);
-        body.push(cells);
-      });
-
-      doc.autoTable({
-        head: headers,
-        body: body,
-        startY: 25,
-        margin: { bottom: 20 }
-      });
-
-      doc.text(rodape, 14, doc.internal.pageSize.height - 10);
-      doc.save("relatorio_carga.pdf");
-    }
-
     document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
     document.getElementById('filtroProduto').addEventListener('change', () => renderizarTabela(dadosGlobais));
     document.getElementById('filtroCargas').addEventListener('change', () => renderizarTabela(dadosGlobais));
     document.getElementById('filtroStatus').addEventListener('change', () => renderizarTabela(dadosGlobais));
-
-    // Chama a função para carregar os dados ao carregar a página
     carregarRelatorio();
   </script>
 </body>
