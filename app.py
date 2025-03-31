@@ -214,6 +214,27 @@ def relatorio_diferencas():
     conn.close()
     return jsonify(relatorio)
 
+@app.route('/registrar_qr_obra', methods=['POST'])
+def registrar_qr_obra():
+    data = request.json
+    codigo_qr = data.get('codigo_qr')
+    usuario = data.get('usuario')
+
+    if not codigo_qr or not usuario:
+        return jsonify({"erro": "Código QR e usuário são obrigatórios"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO recebimento_obra (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
+        conn.commit()
+        return jsonify({"mensagem": "QR Code registrado com sucesso na obra!"}), 201
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 
 if __name__ == '__main__':
     app.run(debug=True)
