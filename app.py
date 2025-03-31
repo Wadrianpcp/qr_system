@@ -172,39 +172,45 @@ def listar_carga():
 
 @app.route('/relatorio_diferencas', methods=['GET'])
 def relatorio_diferencas():
-    conn = get_db_connection()
-    cur = conn.cursor()
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
 
-    cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM registros_qr GROUP BY codigo_qr")
-    bipados = cur.fetchall()
-    bipados_dict = {codigo: qtd for codigo, qtd in bipados}
+        cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM registros_qr GROUP BY codigo_qr")
+        bipados = cur.fetchall()
+        bipados_dict = {codigo: qtd for codigo, qtd in bipados}
 
-    cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
-    lista = cur.fetchall()
-    relatorio = []
+        cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
+        lista = cur.fetchall()
+        relatorio = []
 
-    for linha in lista:
-        cod_insumo, produto, uhs, obra, cargas, total, pav = linha
-        total = int(total)
-        bipado_disponivel = bipados_dict.get(cod_insumo, 0)
-        atendido = min(bipado_disponivel, total)
-        faltando = total - atendido
-        bipados_dict[cod_insumo] = bipado_disponivel - atendido
+        for linha in lista:
+            cod_insumo, produto, uhs, obra, cargas, total, pav = linha
+            total = int(total)
+            bipado_disponivel = bipados_dict.get(cod_insumo, 0)
+            atendido = min(bipado_disponivel, total)
+            faltando = total - atendido
+            bipados_dict[cod_insumo] = bipado_disponivel - atendido
 
-        relatorio.append({
-            "cod_insumo": cod_insumo,
-            "produto": produto,
-            "obra": obra,
-            "cargas": cargas,
-            "total_necessario": total,
-            "bipado": atendido,
-            "faltando": faltando
-        })
+            relatorio.append({
+                "cod_insumo": cod_insumo,
+                "produto": produto,
+                "obra": obra,
+                "cargas": cargas,
+                "total_necessario": total,
+                "bipado": atendido,
+                "faltando": faltando
+            })
 
-    cur.close()
-    conn.close()
+        cur.close()
+        conn.close()
 
-    return jsonify(relatorio)
+        return jsonify(relatorio)
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
 @app.route('/excluir_qr_obra/<int:id>', methods=['DELETE'])
 def excluir_qr_obra(id):
     conn = get_db_connection()
