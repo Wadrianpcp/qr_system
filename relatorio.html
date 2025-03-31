@@ -210,14 +210,15 @@
 
         const row = document.createElement('tr');
         row.className = classe;
-        row.innerHTML = 
-          <td>${item.cod_insumo}</td>
-          <td>${item.produto}</td>
-          <td>${item.obra}</td>
-          <td>${item.cargas}</td>
-          <td>${item.total_necessario}</td>
-          <td>${item.bipado}</td>
-          <td>${item.faltando}</td>
+       row.innerHTML = `
+  <td>${item.cod_insumo}</td>
+  <td>${item.produto}</td>
+  <td>${item.obra}</td>
+  <td>${item.cargas}</td>
+  <td>${item.total_necessario}</td>
+  <td>${item.bipado}</td>
+  <td>${item.faltando}</td>
+`;
         ;
         tabela.appendChild(row);
       });
