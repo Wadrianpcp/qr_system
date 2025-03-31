@@ -123,14 +123,21 @@
 
     function carregarRelatorio() {
       fetch('/relatorio_diferencas')
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`Erro na requisição: ${res.status}`);
+          }
+          return res.json();
+        })
         .then(data => {
+          console.log("✅ Dados recebidos do servidor:", data);
           dadosGlobais = data;
           preencherFiltros(data);
           renderizarTabela(data);
         })
-        .catch(() => {
-          document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Erro ao carregar dados.</td></tr>';
+        .catch((erro) => {
+          console.error("❌ Erro ao carregar os dados:", erro);
+          document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro ao carregar dados: ${erro.message}</td></tr>`;
         });
     }
 
@@ -210,7 +217,7 @@
 
         const row = document.createElement('tr');
         row.className = classe;
-       row.innerHTML = `
+        row.innerHTML = `
   <td>${item.cod_insumo}</td>
   <td>${item.produto}</td>
   <td>${item.obra}</td>
@@ -219,7 +226,6 @@
   <td>${item.bipado}</td>
   <td>${item.faltando}</td>
 `;
-        ;
         tabela.appendChild(row);
       });
 
@@ -231,16 +237,16 @@
     function exportarExcel() {
       const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
       const agora = new Date().toLocaleString();
-      const rodape = Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora};
+      const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
 
       const tabela = document.querySelector("table");
       const wb = XLSX.utils.table_to_book(tabela, { sheet: "Relatório" });
 
       const ws = wb.Sheets["Relatório"];
       const ultimaLinha = XLSX.utils.decode_range(ws['!ref']).e.r + 2;
-      const cellAddress = A${ultimaLinha};
+      const cellAddress = `A${ultimaLinha}`;
       ws[cellAddress] = { t: 's', v: rodape };
-      ws['!ref'] = ws['!ref'].replace(/:\w+\d+$/, :A${ultimaLinha});
+      ws['!ref'] = ws['!ref'].replace(/:\w+\d+$/, `:A${ultimaLinha}`);
 
       XLSX.writeFile(wb, "relatorio_carga.xlsx");
     }
@@ -248,7 +254,7 @@
     function exportarPDF() {
       const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
       const agora = new Date().toLocaleString();
-      const rodape = Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora};
+      const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
 
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
@@ -279,6 +285,7 @@
     document.getElementById('filtroCargas').addEventListener('change', () => renderizarTabela(dadosGlobais));
     document.getElementById('filtroStatus').addEventListener('change', () => renderizarTabela(dadosGlobais));
 
+    // Chama a função para carregar os dados ao carregar a página
     carregarRelatorio();
   </script>
 </body>
