@@ -175,10 +175,15 @@ def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT codigo_qr, COUNT(*) AS bipado FROM registros_qr GROUP BY codigo_qr")
-    bipados = cur.fetchall()
-    bipados_dict = {codigo: qtd for codigo, qtd in bipados}
+    # Bipagens feitas na FÁBRICA (registros_qr)
+    cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
+    bipado_fabrica_dict = dict(cur.fetchall())
 
+    # Bipagens feitas na OBRA (recebimento_obra)
+    cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
+    bipado_obra_dict = dict(cur.fetchall())
+
+    # Lista de carga
     cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
     lista = cur.fetchall()
     relatorio = []
@@ -186,10 +191,8 @@ def relatorio_diferencas():
     for linha in lista:
         cod_insumo, produto, uhs, obra, cargas, total, pav = linha
         total = int(total)
-        bipado_disponivel = bipados_dict.get(cod_insumo, 0)
-        atendido = min(bipado_disponivel, total)
-        faltando = total - atendido
-        bipados_dict[cod_insumo] = bipado_disponivel - atendido
+        bipado_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
+        bipado_obra = bipado_obra_dict.get(cod_insumo, 0)
 
         relatorio.append({
             "cod_insumo": cod_insumo,
@@ -197,13 +200,15 @@ def relatorio_diferencas():
             "obra": obra,
             "cargas": cargas,
             "total_necessario": total,
-            "bipado": atendido,
-            "faltando": faltando
+            "bipado_fabrica": bipado_fabrica,
+            "bipado_obra": bipado_obra
         })
 
     cur.close()
     conn.close()
+    return jsonify(relatorio)
 
+    
     return jsonify(relatorio)
 @app.route('/excluir_qr_obra/<int:id>', methods=['DELETE'])
 def excluir_qr_obra(id):
