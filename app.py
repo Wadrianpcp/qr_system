@@ -175,17 +175,14 @@ def relatorio_diferencas():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Bipado na fábrica
     cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
     bipado_fabrica_raw = cur.fetchall()
     bipado_fabrica_dict = {codigo: qtd for codigo, qtd in bipado_fabrica_raw}
 
-    # Bipado na obra
     cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
     bipado_obra_raw = cur.fetchall()
     bipado_obra_dict = {codigo: qtd for codigo, qtd in bipado_obra_raw}
 
-    # Lista de carga original
     cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
     lista = cur.fetchall()
 
@@ -193,8 +190,15 @@ def relatorio_diferencas():
     for linha in lista:
         cod_insumo, produto, uhs, obra, cargas, total, pav = linha
         total = int(total)
-        bipado_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
-        bipado_obra = bipado_obra_dict.get(cod_insumo, 0)
+
+        # Distribuir bipados disponíveis (reduzindo conforme usa)
+        disponivel_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
+        usado_fabrica = min(disponivel_fabrica, total)
+        bipado_fabrica_dict[cod_insumo] = disponivel_fabrica - usado_fabrica
+
+        disponivel_obra = bipado_obra_dict.get(cod_insumo, 0)
+        usado_obra = min(disponivel_obra, total)
+        bipado_obra_dict[cod_insumo] = disponivel_obra - usado_obra
 
         relatorio.append({
             "cod_insumo": cod_insumo,
@@ -202,13 +206,14 @@ def relatorio_diferencas():
             "obra": obra,
             "cargas": cargas,
             "total_necessario": total,
-            "bipado_fabrica": bipado_fabrica,
-            "bipado_obra": bipado_obra
+            "bipado_fabrica": usado_fabrica,
+            "bipado_obra": usado_obra
         })
 
     cur.close()
     conn.close()
     return jsonify(relatorio)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
