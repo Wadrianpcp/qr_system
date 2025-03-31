@@ -96,22 +96,23 @@
     <button onclick="window.location.href='/'">Voltar</button>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>COD INSUMO</th>
-        <th>PRODUTO</th>
-        <th>OBRA</th>
-        <th>CARGAS</th>
-        <th>TOTAL NECESSÁRIO</th>
-        <th>BIPADO</th>
-        <th>FALTANDO</th>
-      </tr>
-    </thead>
-    <tbody id="tabelaRelatorio">
-      <tr><td colspan="7">Carregando dados...</td></tr>
-    </tbody>
-  </table>
+<table>
+  <thead>
+    <tr>
+      <th>COD INSUMO</th>
+      <th>PRODUTO</th>
+      <th>OBRA</th>
+      <th>CARGAS</th>
+      <th>TOTAL NECESSÁRIO</th>
+      <th>BIPADO FÁBRICA</th>
+      <th>BIPADO OBRA</th>
+    </tr>
+  </thead>
+  <tbody id="tabelaRelatorio">
+    <tr><td colspan="7">Carregando dados...</td></tr>
+  </tbody>
+</table>
+
 
   <!-- Bibliotecas para exportação -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -165,67 +166,70 @@
       });
     }
 
-    function renderizarTabela(data) {
-      const filtroObra = document.getElementById('filtroObra').value;
-      const filtroProduto = document.getElementById('filtroProduto').value;
-      const filtroCargas = document.getElementById('filtroCargas').value;
-      const filtroStatus = document.getElementById('filtroStatus').value;
+function renderizarTabela(data) {
+  const filtroObra = document.getElementById('filtroObra').value;
+  const filtroProduto = document.getElementById('filtroProduto').value;
+  const filtroCargas = document.getElementById('filtroCargas').value;
+  const filtroStatus = document.getElementById('filtroStatus').value;
 
-      const tabela = document.getElementById('tabelaRelatorio');
-      tabela.innerHTML = '';
+  const tabela = document.getElementById('tabelaRelatorio');
+  tabela.innerHTML = '';
 
-      let atendido = 0, parcial = 0, naoAtendido = 0;
+  let atendido = 0, parcial = 0, naoAtendido = 0;
 
-      const filtrado = data.filter(item => {
-        let status;
-        if (item.bipado == 0) status = 'vermelho';
-        else if (item.faltando == 0) status = 'verde';
-        else status = 'amarelo';
+  const filtrado = data.filter(item => {
+    let status;
+    if (item.bipado_fabrica == 0 && item.bipado_obra == 0) status = 'vermelho';
+    else if ((item.bipado_fabrica + item.bipado_obra) >= item.total_necessario) status = 'verde';
+    else status = 'amarelo';
 
-        const condObra = !filtroObra || item.obra === filtroObra;
-        const condProd = !filtroProduto || item.produto === filtroProduto;
-        const condCargas = !filtroCargas || item.cargas === filtroCargas;
-        const condStatus = !filtroStatus || status === filtroStatus;
+    const condObra = !filtroObra || item.obra === filtroObra;
+    const condProd = !filtroProduto || item.produto === filtroProduto;
+    const condCargas = !filtroCargas || item.cargas === filtroCargas;
+    const condStatus = !filtroStatus || status === filtroStatus;
 
-        return condObra && condProd && condCargas && condStatus;
-      });
+    return condObra && condProd && condCargas && condStatus;
+  });
 
-      if (filtrado.length === 0) {
-        tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
-        return;
-      }
+  if (filtrado.length === 0) {
+    tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
+    return;
+  }
 
-      filtrado.forEach(item => {
-        let classe = '';
-        if (item.bipado == 0) {
-          classe = 'status-vermelho';
-          naoAtendido++;
-        } else if (item.faltando == 0) {
-          classe = 'status-verde';
-          atendido++;
-        } else {
-          classe = 'status-amarelo';
-          parcial++;
-        }
+  filtrado.forEach(item => {
+    let classe = '';
+    const totalBipado = item.bipado_fabrica + item.bipado_obra;
 
-        const row = document.createElement('tr');
-        row.className = classe;
-        row.innerHTML = `
-          <td>${item.cod_insumo}</td>
-          <td>${item.produto}</td>
-          <td>${item.obra}</td>
-          <td>${item.cargas}</td>
-          <td>${item.total_necessario}</td>
-          <td>${item.bipado}</td>
-          <td>${item.faltando}</td>
-        `;
-        tabela.appendChild(row);
-      });
-
-      document.getElementById('resumoVerde').textContent = atendido;
-      document.getElementById('resumoVermelho').textContent = naoAtendido;
-      document.getElementById('resumoTotal').textContent = filtrado.length;
+    if (totalBipado === 0) {
+      classe = 'status-vermelho';
+      naoAtendido++;
+    } else if (totalBipado >= item.total_necessario) {
+      classe = 'status-verde';
+      atendido++;
+    } else {
+      classe = 'status-amarelo';
+      parcial++;
     }
+
+    const row = document.createElement('tr');
+    row.className = classe;
+    row.innerHTML = `
+      <td>${item.cod_insumo}</td>
+      <td>${item.produto}</td>
+      <td>${item.obra}</td>
+      <td>${item.cargas}</td>
+      <td>${item.total_necessario}</td>
+      <td>${item.bipado_fabrica}</td>
+      <td>${item.bipado_obra}</td>
+    `;
+    tabela.appendChild(row);
+  });
+
+  document.getElementById('resumoVerde').textContent = atendido;
+  document.getElementById('resumoVermelho').textContent = naoAtendido;
+  document.getElementById('resumoTotal').textContent = filtrado.length;
+}
+
 
     function exportarExcel() {
       const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
