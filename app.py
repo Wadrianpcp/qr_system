@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template
 import psycopg2
 import pandas as pd
 from datetime import datetime
@@ -130,7 +130,6 @@ def excluir_qr(id):
 
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
-    
     if 'arquivo' not in request.files:
         return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
 
@@ -181,39 +180,24 @@ def relatorio_diferencas():
     cur = conn.cursor()
 
     cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
-    bipado_fabrica_raw = cur.fetchall()
-    bipado_fabrica_dict = {codigo: qtd for codigo, qtd in bipado_fabrica_raw}
+    bipado_fabrica_dict = dict(cur.fetchall())
 
     cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
-    bipado_obra_raw = cur.fetchall()
-    bipado_obra_dict = {codigo: qtd for codigo, qtd in bipado_obra_raw}
+    bipado_obra_dict = dict(cur.fetchall())
 
-    cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY obra, cod_insumo")
+    cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY id")
     lista = cur.fetchall()
+    colunas = [desc[0] for desc in cur.description]
 
     relatorio = []
     for linha in lista:
-        cod_insumo, produto, uhs, obra, cargas, total, pav = linha
-        total = int(total)
+        registro = dict(zip(colunas, linha))
+        cod_insumo = registro["cod_insumo"]
 
-        # Distribuir bipados disponíveis (reduzindo conforme usa)
-        disponivel_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
-        usado_fabrica = min(disponivel_fabrica, total)
-        bipado_fabrica_dict[cod_insumo] = disponivel_fabrica - usado_fabrica
+        registro["bipado_fabrica"] = bipado_fabrica_dict.get(cod_insumo, 0)
+        registro["bipado_obra"] = bipado_obra_dict.get(cod_insumo, 0)
 
-        disponivel_obra = bipado_obra_dict.get(cod_insumo, 0)
-        usado_obra = min(disponivel_obra, total)
-        bipado_obra_dict[cod_insumo] = disponivel_obra - usado_obra
-
-        relatorio.append({
-            "cod_insumo": cod_insumo,
-            "produto": produto,
-            "obra": obra,
-            "cargas": cargas,
-            "total_necessario": total,
-            "bipado_fabrica": usado_fabrica,
-            "bipado_obra": usado_obra
-        })
+        relatorio.append(registro)
 
     cur.close()
     conn.close()
@@ -265,8 +249,6 @@ def gerar_etiquetas():
     conn.close()
     registros = [dict(zip(colunas, linha)) for linha in dados]
     return render_template("etiquetas.html", registros=registros)
-
-
 
 if __name__ == '__main__':
     app.run(debug=True)
