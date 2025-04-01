@@ -159,7 +159,7 @@ def upload_lista_carga():
 
         return jsonify({'mensagem': 'Lista de carga importada com sucesso.'}), 200
 
-   except Exception as e:
+    except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
 @app.route('/listar_carga', methods=['GET'])
