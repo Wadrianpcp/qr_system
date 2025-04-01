@@ -130,6 +130,7 @@ def excluir_qr(id):
 
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
+    
     if 'arquivo' not in request.files:
         return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
 
@@ -159,6 +160,7 @@ def upload_lista_carga():
         return jsonify({'mensagem': 'Lista de carga importada com sucesso.'}), 200
 
     except Exception as e:
+print("Erro ao importar lista de carga:", e)  # Adicione isto
         return jsonify({'erro': str(e)}), 500
 
 @app.route('/listar_carga', methods=['GET'])
