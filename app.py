@@ -173,7 +173,6 @@ def listar_carga():
 
     registros_formatados = [dict(zip(colunas, linha)) for linha in dados]
     return jsonify(registros_formatados)
-
 @app.route('/relatorio_diferencas', methods=['GET'])
 def relatorio_diferencas():
     conn = get_db_connection()
@@ -193,23 +192,31 @@ def relatorio_diferencas():
     for linha in lista:
         registro = dict(zip(colunas, linha))
         cod_insumo = registro["cod_insumo"]
+        total = int(registro["total"])
 
-        registro["bipado_fabrica"] = bipado_fabrica_dict.get(cod_insumo, 0)
-        registro["bipado_obra"] = bipado_obra_dict.get(cod_insumo, 0)
+        # Distribuir bipados disponíveis (reduzindo conforme usa)
+        disponivel_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
+        usado_fabrica = min(disponivel_fabrica, total)
+        bipado_fabrica_dict[cod_insumo] = disponivel_fabrica - usado_fabrica
+
+        disponivel_obra = bipado_obra_dict.get(cod_insumo, 0)
+        usado_obra = min(disponivel_obra, total)
+        bipado_obra_dict[cod_insumo] = disponivel_obra - usado_obra
 
         relatorio.append({
-    "cod_insumo": cod_insumo,
-    "produto": produto,
-    "obra": obra,
-    "cargas": cargas,
-    "total_necessario": total,  # <- aqui usamos a chave esperada
-    "bipado_fabrica": usado_fabrica,
-    "bipado_obra": usado_obra
-})
+            "cod_insumo": cod_insumo,
+            "produto": registro["produto"],
+            "obra": registro["obra"],
+            "cargas": registro["cargas"],
+            "total_necessario": total,
+            "bipado_fabrica": usado_fabrica,
+            "bipado_obra": usado_obra
+        })
 
     cur.close()
     conn.close()
     return jsonify(relatorio)
+
 
 @app.route('/registrar_qr_obra', methods=['POST'])
 def registrar_qr_obra():
