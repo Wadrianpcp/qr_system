@@ -126,36 +126,55 @@ def excluir_qr(id):
 
 @app.route('/upload_lista_carga', methods=['POST'])
 def upload_lista_carga():
-    if 'arquivo' not in request.files:
-        return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
-
-    arquivo = request.files['arquivo']
-    if arquivo.filename == '':
-        return jsonify({'erro': 'Nome de arquivo vazio'}), 400
-
     try:
+        if 'arquivo' not in request.files:
+            print("[ERRO] Nenhum arquivo foi enviado no campo 'arquivo'.")
+            return jsonify({'erro': 'Nenhum arquivo enviado.'}), 400
+
+        arquivo = request.files['arquivo']
+
+        if arquivo.filename == '':
+            print("[ERRO] Arquivo enviado sem nome.")
+            return jsonify({'erro': 'Nome de arquivo vazio.'}), 400
+
+        print(f"[INFO] Arquivo recebido: {arquivo.filename}")
+
+        # Lê o arquivo Excel com pandas
         df = pd.read_excel(arquivo)
+
         colunas_esperadas = ["COD INSUMO", "PRODUTO", "UHS", "OBRA", "CARGAS", "TOTAL", "PAV"]
-        if not all(col in df.columns for col in colunas_esperadas):
-            return jsonify({'erro': 'As colunas do Excel não correspondem às esperadas.'}), 400
+        colunas_excel = df.columns.tolist()
+
+        print(f"[INFO] Colunas do Excel: {colunas_excel}")
+
+        if not all(col in colunas_excel for col in colunas_esperadas):
+            return jsonify({
+                'erro': f'As colunas do Excel não correspondem às esperadas.\nEsperadas: {colunas_esperadas}\nRecebidas: {colunas_excel}'
+            }), 400
 
         conn = get_db_connection()
         cur = conn.cursor()
 
         for _, row in df.iterrows():
-            cur.execute(
-                "INSERT INTO lista_de_carga (cod_insumo, produto, uhs, obra, cargas, total, pav) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (row["COD INSUMO"], row["PRODUTO"], row["UHS"], row["OBRA"], row["CARGAS"], row["TOTAL"], row["PAV"])
-            )
+            cur.execute("""
+                INSERT INTO lista_de_carga (cod_insumo, produto, uhs, obra, cargas, total, pav)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                row["COD INSUMO"], row["PRODUTO"], row["UHS"], row["OBRA"],
+                row["CARGAS"], row["TOTAL"], row["PAV"]
+            ))
 
         conn.commit()
         cur.close()
         conn.close()
 
+        print("[SUCESSO] Dados inseridos com sucesso.")
         return jsonify({'mensagem': 'Lista de carga importada com sucesso.'}), 200
 
     except Exception as e:
-        return jsonify({'erro': str(e)}), 500
+        print(f"[ERRO] Exceção ao importar: {str(e)}")
+        return jsonify({'erro': f'Erro ao processar arquivo: {str(e)}'}), 500
+
 
 @app.route('/listar_carga', methods=['GET'])
 def listar_carga():
