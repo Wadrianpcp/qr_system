@@ -58,6 +58,38 @@
   </table>
 
   <script>
+
+function exportarPDF() {
+  const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
+  const agora = new Date().toLocaleString();
+  const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.text("Relatório de Atendimento da Carga", 14, 15);
+
+  const headers = [["COD INSUMO", "PRODUTO", "OBRA", "CARGAS", "TOTAL NECESSÁRIO", "BIPADO FABRICA", "BIPADO OBRA"]];
+  const body = [];
+
+  document.querySelectorAll("#tabelaRelatorio tr").forEach(row => {
+    const cells = Array.from(row.children).map(td => td.textContent.trim());
+    body.push(cells);
+  });
+
+  doc.autoTable({
+    head: headers,
+    body: body,
+    startY: 25,
+    margin: { bottom: 20 },
+    styles: { fontSize: 8 }
+  });
+
+  doc.text(rodape, 14, doc.internal.pageSize.height - 10);
+  doc.save("relatorio_carga.pdf");
+}
+
+    
     let dadosGlobais = [];
     function carregarRelatorio() {
       fetch('/relatorio_diferencas')
@@ -136,5 +168,8 @@
     document.getElementById('filtroStatus').addEventListener('change', () => renderizarTabela(dadosGlobais));
     carregarRelatorio();
   </script>
+  <!-- jsPDF e AutoTable para exportar para PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>
