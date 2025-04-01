@@ -3,7 +3,6 @@ import psycopg2
 import pandas as pd
 from datetime import datetime
 import pytz
-import traceback
 
 app = Flask(__name__)
 
@@ -15,6 +14,10 @@ def get_db_connection():
 @app.route('/')
 def index():
     return send_file('index.html')
+
+@app.route('/etiquetas')
+def etiquetas():
+    return send_file('etiquetas.html')
 
 @app.route('/obra')
 def obra():
@@ -137,14 +140,8 @@ def upload_lista_carga():
     try:
         df = pd.read_excel(arquivo)
         colunas_esperadas = ["COD INSUMO", "PRODUTO", "UHS", "OBRA", "CARGAS", "TOTAL", "PAV"]
-        colunas_encontradas = df.columns.tolist()
-
-        if not all(col in colunas_encontradas for col in colunas_esperadas):
-            return jsonify({
-                'erro': 'As colunas do Excel não correspondem às esperadas.',
-                'encontradas': colunas_encontradas,
-                'esperadas': colunas_esperadas
-            }), 400
+        if not all(col in df.columns for col in colunas_esperadas):
+            return jsonify({'erro': 'As colunas do Excel não correspondem às esperadas.'}), 400
 
         conn = get_db_connection()
         cur = conn.cursor()
@@ -162,7 +159,7 @@ def upload_lista_carga():
         return jsonify({'mensagem': 'Lista de carga importada com sucesso.'}), 200
 
     except Exception as e:
-        return jsonify({'erro': str(e), 'trace': traceback.format_exc()}), 500
+        return jsonify({'erro': str(e)}), 500
 
 @app.route('/listar_carga', methods=['GET'])
 def listar_carga():
@@ -198,6 +195,7 @@ def relatorio_diferencas():
         cod_insumo, produto, uhs, obra, cargas, total, pav = linha
         total = int(total)
 
+        # Distribuir bipados disponíveis (reduzindo conforme usa)
         disponivel_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
         usado_fabrica = min(disponivel_fabrica, total)
         bipado_fabrica_dict[cod_insumo] = disponivel_fabrica - usado_fabrica
@@ -254,6 +252,20 @@ def excluir_qr_obra(id):
     finally:
         cur.close()
         conn.close()
+
+@app.route('/gerar_etiquetas')
+def gerar_etiquetas():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM lista_de_carga ORDER BY obra")
+    dados = cur.fetchall()
+    colunas = [desc[0] for desc in cur.description]
+    cur.close()
+    conn.close()
+    registros = [dict(zip(colunas, linha)) for linha in dados]
+    return render_template("etiquetas.html", registros=registros)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
