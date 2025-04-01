@@ -43,7 +43,7 @@
   <div class="btn-container">
     <button onclick="exportarExcel()">Exportar para Excel</button>
     <button onclick="exportarPDF()">Exportar para PDF</button>
-    <button onclick="window.location.href='/'">Voltar</button>
+    <button id="voltarBtn">Voltar</button>
   </div>
   <table>
     <thead>
@@ -59,6 +59,17 @@
 
   <script>
 
+document.getElementById("voltarBtn").addEventListener("click", () => {
+  const params = new URLSearchParams(window.location.search);
+  const origem = params.get("origem");
+  if (origem === "obra") {
+    window.location.href = "/obra";
+  } else {
+    window.location.href = "/";
+  }
+});
+
+    
 function exportarPDF() {
   const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
   const agora = new Date().toLocaleString();
