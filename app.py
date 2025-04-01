@@ -197,7 +197,15 @@ def relatorio_diferencas():
         registro["bipado_fabrica"] = bipado_fabrica_dict.get(cod_insumo, 0)
         registro["bipado_obra"] = bipado_obra_dict.get(cod_insumo, 0)
 
-        relatorio.append(registro)
+        relatorio.append({
+    "cod_insumo": cod_insumo,
+    "produto": produto,
+    "obra": obra,
+    "cargas": cargas,
+    "total_necessario": total,  # <- aqui usamos a chave esperada
+    "bipado_fabrica": usado_fabrica,
+    "bipado_obra": usado_obra
+})
 
     cur.close()
     conn.close()
