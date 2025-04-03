@@ -94,11 +94,12 @@
         <th>ID</th>
         <th>Código QR</th>
         <th>Usuário</th>
+        <th>Data e Hora</th>
         <th>Ação</th>
       </tr>
     </thead>
     <tbody id="tabelaRegistros">
-      <tr><td colspan="4">Carregando...</td></tr>
+      <tr><td colspan="5">Carregando...</td></tr>
     </tbody>
   </table>
 
@@ -114,7 +115,7 @@
           renderizarTabela();
         })
         .catch(() => {
-          document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='4'>Erro ao carregar dados.</td></tr>";
+          document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='5'>Erro ao carregar dados.</td></tr>";
         });
     }
 
@@ -153,7 +154,7 @@
       );
 
       if (filtrado.length === 0) {
-        tabela.innerHTML = "<tr><td colspan='4'>Nenhum registro encontrado.</td></tr>";
+        tabela.innerHTML = "<tr><td colspan='5'>Nenhum registro encontrado.</td></tr>";
         return;
       }
 
@@ -163,6 +164,7 @@
             <td>${r.id}</td>
             <td>${r.codigo_qr}</td>
             <td>${r.usuario}</td>
+            <td>${r.data_hora}</td>
             <td><button onclick="excluirRegistro(${r.id})">Excluir</button></td>
           </tr>
         `;
