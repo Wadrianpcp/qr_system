@@ -82,13 +82,14 @@ def listar_qr():
         {
             "id": r[0],
             "codigo_qr": r[1],
-            "data_hora": r[2].astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[2] else "",
+            "data_hora": r[2].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[2] else "",
             "usuario": r[3],
             "status": r[4]
         }
         for r in registros
     ]
     return jsonify(registros_formatados)
+
 
 @app.route('/listar_qr_obra', methods=['GET'])
 def listar_qr_obra():
@@ -100,11 +101,12 @@ def listar_qr_obra():
         cur.close()
         conn.close()
 
+        tz = pytz.timezone('America/Sao_Paulo')  # fuso de Brasília
         registros_formatados = [
             {
                 "id": r[0],
                 "codigo_qr": r[1],
-                "data_hora": r[2].strftime('%d/%m/%Y %H:%M:%S') if r[2] else "",
+                "data_hora": r[2].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[2] else "",
                 "usuario": r[3],
                 "status": r[4]
             }
@@ -113,6 +115,7 @@ def listar_qr_obra():
         return jsonify(registros_formatados)
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
+
 
 @app.route('/excluir_qr/<int:id>', methods=['DELETE'])
 def excluir_qr(id):
