@@ -26,7 +26,8 @@
   </div>
   <div id="filtros">
     <label>Obra: <select id="filtroObra"><option value="">Todas</option></select></label>
-    <label>Produto: <select id="filtroProduto"><option value="">Todos</option></select></label>
+    <label for="filtroCodInsumo">COD INSUMO:</label>
+    <input type="text" id="filtroCodInsumo" placeholder="Digite o código...">
     <label>Cargas: <select id="filtroCargas"><option value="">Todas</option></select></label>
     <label>Status: <select id="filtroStatus">
       <option value="">Todos</option>
@@ -58,129 +59,132 @@
   </table>
 
   <script>
+  document.getElementById("voltarBtn").addEventListener("click", () => {
+    const params = new URLSearchParams(window.location.search);
+    const origem = params.get("origem");
+    if (origem === "obra") {
+      window.location.href = "/obra";
+    } else {
+      window.location.href = "/";
+    }
+  });
 
-document.getElementById("voltarBtn").addEventListener("click", () => {
-  const params = new URLSearchParams(window.location.search);
-  const origem = params.get("origem");
-  if (origem === "obra") {
-    window.location.href = "/obra";
-  } else {
-    window.location.href = "/";
+  function exportarPDF() {
+    const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
+    const agora = new Date().toLocaleString();
+    const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.text("Relatório de Atendimento da Carga", 14, 15);
+
+    const headers = [["COD INSUMO", "PRODUTO", "OBRA", "CARGAS", "TOTAL NECESSÁRIO", "BIPADO FABRICA", "BIPADO OBRA"]];
+    const body = [];
+
+    document.querySelectorAll("#tabelaRelatorio tr").forEach(row => {
+      const cells = Array.from(row.children).map(td => td.textContent.trim());
+      body.push(cells);
+    });
+
+    doc.autoTable({
+      head: headers,
+      body: body,
+      startY: 25,
+      margin: { bottom: 20 },
+      styles: { fontSize: 8 }
+    });
+
+    doc.text(rodape, 14, doc.internal.pageSize.height - 10);
+    doc.save("relatorio_carga.pdf");
   }
-});
 
-    
-function exportarPDF() {
-  const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
-  const agora = new Date().toLocaleString();
-  const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  doc.text("Relatório de Atendimento da Carga", 14, 15);
-
-  const headers = [["COD INSUMO", "PRODUTO", "OBRA", "CARGAS", "TOTAL NECESSÁRIO", "BIPADO FABRICA", "BIPADO OBRA"]];
-  const body = [];
-
-  document.querySelectorAll("#tabelaRelatorio tr").forEach(row => {
-    const cells = Array.from(row.children).map(td => td.textContent.trim());
-    body.push(cells);
-  });
-
-  doc.autoTable({
-    head: headers,
-    body: body,
-    startY: 25,
-    margin: { bottom: 20 },
-    styles: { fontSize: 8 }
-  });
-
-  doc.text(rodape, 14, doc.internal.pageSize.height - 10);
-  doc.save("relatorio_carga.pdf");
-}
-
-    
-    let dadosGlobais = [];
-    function carregarRelatorio() {
-      fetch('/relatorio_diferencas')
-        .then(res => res.json())
-        .then(data => {
-          dadosGlobais = data;
-          preencherFiltros(data);
-          renderizarTabela(data);
-        })
-        .catch((erro) => {
-          document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: ${erro.message}</td></tr>`;
-        });
-    }
-    function preencherFiltros(data) {
-      const obras = [...new Set(data.map(d => d.obra))];
-      const produtos = [...new Set(data.map(d => d.produto))];
-      const cargas = [...new Set(data.map(d => d.cargas))];
-      const obraSelect = document.getElementById('filtroObra');
-      const produtoSelect = document.getElementById('filtroProduto');
-      const cargasSelect = document.getElementById('filtroCargas');
-      obras.forEach(o => obraSelect.innerHTML += `<option value="${o}">${o}</option>`);
-      produtos.forEach(p => produtoSelect.innerHTML += `<option value="${p}">${p}</option>`);
-      cargas.forEach(c => cargasSelect.innerHTML += `<option value="${c}">${c}</option>`);
-    }
-    function renderizarTabela(data) {
-      const filtroObra = document.getElementById('filtroObra').value;
-      const filtroProduto = document.getElementById('filtroProduto').value;
-      const filtroCargas = document.getElementById('filtroCargas').value;
-      const filtroStatus = document.getElementById('filtroStatus').value;
-      const tabela = document.getElementById('tabelaRelatorio');
-      tabela.innerHTML = '';
-      let verde = 0, vermelho = 0;
-      const filtrado = data.filter(item => {
-        let status;
-        if (item.bipado_fabrica > 0 && item.bipado_obra > 0) status = 'verde';
-        else if (item.bipado_fabrica > 0 && item.bipado_obra == 0) status = 'amarelo';
-        else status = 'vermelho';
-        const condObra = !filtroObra || item.obra === filtroObra;
-        const condProd = !filtroProduto || item.produto === filtroProduto;
-        const condCargas = !filtroCargas || item.cargas === filtroCargas;
-        const condStatus = !filtroStatus || status === filtroStatus;
-        return condObra && condProd && condCargas && condStatus;
+  let dadosGlobais = [];
+  function carregarRelatorio() {
+    fetch('/relatorio_diferencas')
+      .then(res => res.json())
+      .then(data => {
+        dadosGlobais = data;
+        preencherFiltros(data);
+        renderizarTabela(data);
+      })
+      .catch((erro) => {
+        document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: ${erro.message}</td></tr>`;
       });
-      if (filtrado.length === 0) {
-        tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
-        return;
+  }
+
+  function preencherFiltros(data) {
+    const obras = [...new Set(data.map(d => d.obra))];
+    const cargas = [...new Set(data.map(d => d.cargas))];
+    const obraSelect = document.getElementById('filtroObra');
+    const cargasSelect = document.getElementById('filtroCargas');
+    obras.forEach(o => obraSelect.innerHTML += `<option value="${o}">${o}</option>`);
+    cargas.forEach(c => cargasSelect.innerHTML += `<option value="${c}">${c}</option>`);
+  }
+
+  function renderizarTabela(data) {
+    const filtroObra = document.getElementById('filtroObra').value;
+    const filtroCodInsumo = document.getElementById('filtroCodInsumo').value.toLowerCase();
+    const filtroCargas = document.getElementById('filtroCargas').value;
+    const filtroStatus = document.getElementById('filtroStatus').value;
+    const tabela = document.getElementById('tabelaRelatorio');
+    tabela.innerHTML = '';
+
+    let verde = 0, vermelho = 0;
+    const filtrado = data.filter(item => {
+      let status;
+      if (item.bipado_fabrica > 0 && item.bipado_obra > 0) status = 'verde';
+      else if (item.bipado_fabrica > 0 && item.bipado_obra == 0) status = 'amarelo';
+      else status = 'vermelho';
+
+      const condObra = !filtroObra || item.obra === filtroObra;
+      const condCodInsumo = !filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo);
+      const condCargas = !filtroCargas || item.cargas === filtroCargas;
+      const condStatus = !filtroStatus || status === filtroStatus;
+
+      return condObra && condCodInsumo && condCargas && condStatus;
+    });
+
+    if (filtrado.length === 0) {
+      tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
+      return;
+    }
+
+    filtrado.forEach(item => {
+      let classe = '';
+      if (item.bipado_fabrica > 0 && item.bipado_obra > 0) {
+        classe = 'status-verde'; verde++;
+      } else if (item.bipado_fabrica > 0 && item.bipado_obra == 0) {
+        classe = 'status-amarelo';
+      } else {
+        classe = 'status-vermelho'; vermelho++;
       }
-      filtrado.forEach(item => {
-        let classe = '';
-        if (item.bipado_fabrica > 0 && item.bipado_obra > 0) {
-          classe = 'status-verde'; verde++;
-        } else if (item.bipado_fabrica > 0 && item.bipado_obra == 0) {
-          classe = 'status-amarelo';
-        } else {
-          classe = 'status-vermelho'; vermelho++;
-        }
-        tabela.innerHTML += `
-          <tr class="${classe}">
-            <td>${item.cod_insumo}</td>
-            <td>${item.produto}</td>
-            <td>${item.obra}</td>
-            <td>${item.cargas}</td>
-            <td>${item.total_necessario}</td>
-            <td>${item.bipado_fabrica}</td>
-            <td>${item.bipado_obra}</td>
-          </tr>
-        `;
-      });
-      document.getElementById('resumoVerde').textContent = verde;
-      document.getElementById('resumoVermelho').textContent = vermelho;
-      document.getElementById('resumoTotal').textContent = filtrado.length;
-    }
-    document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
-    document.getElementById('filtroProduto').addEventListener('change', () => renderizarTabela(dadosGlobais));
-    document.getElementById('filtroCargas').addEventListener('change', () => renderizarTabela(dadosGlobais));
-    document.getElementById('filtroStatus').addEventListener('change', () => renderizarTabela(dadosGlobais));
-    carregarRelatorio();
+      tabela.innerHTML += `
+        <tr class="${classe}">
+          <td>${item.cod_insumo}</td>
+          <td>${item.produto}</td>
+          <td>${item.obra}</td>
+          <td>${item.cargas}</td>
+          <td>${item.total_necessario}</td>
+          <td>${item.bipado_fabrica}</td>
+          <td>${item.bipado_obra}</td>
+        </tr>
+      `;
+    });
+
+    document.getElementById('resumoVerde').textContent = verde;
+    document.getElementById('resumoVermelho').textContent = vermelho;
+    document.getElementById('resumoTotal').textContent = filtrado.length;
+  }
+
+  document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
+  document.getElementById('filtroCargas').addEventListener('change', () => renderizarTabela(dadosGlobais));
+  document.getElementById('filtroStatus').addEventListener('change', () => renderizarTabela(dadosGlobais));
+  document.getElementById('filtroCodInsumo').addEventListener('input', () => renderizarTabela(dadosGlobais));
+
+  carregarRelatorio();
   </script>
-  <!-- jsPDF e AutoTable para exportar para PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>
