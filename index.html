@@ -13,16 +13,8 @@
       padding: 20px;
       text-align: center;
     }
-
-    .container {
-      max-width: 800px;
-      margin: auto;
-    }
-
-    h1 {
-      color: #333;
-    }
-
+    .container { max-width: 800px; margin: auto; }
+    h1 { color: #333; }
     .top-bar {
       display: flex;
       flex-wrap: wrap;
@@ -31,13 +23,11 @@
       align-items: center;
       margin-bottom: 20px;
     }
-
-    input[type="text"], input[type="range"] {
+    select, input[type="text"], input[type="range"] {
       padding: 10px;
       font-size: 16px;
       width: 200px;
     }
-
     button {
       padding: 10px 20px;
       font-size: 16px;
@@ -47,7 +37,6 @@
       cursor: pointer;
       border-radius: 5px;
     }
-
     #cameraButton {
       background: none;
       border: none;
@@ -55,7 +44,6 @@
       cursor: pointer;
       color: #1976d2;
     }
-
     #videoPreview {
       display: none;
       width: 100%;
@@ -64,13 +52,11 @@
       border: 2px solid #1976d2;
       border-radius: 10px;
     }
-
     #mensagem {
       margin: 10px;
       font-weight: bold;
       color: green;
     }
-
     #display {
       position: fixed;
       top: 0;
@@ -85,25 +71,19 @@
       justify-content: center;
       z-index: 999;
     }
-
-    #historico {
-      margin-top: 30px;
-    }
-
+    #historico { margin-top: 30px; }
     #historico ul {
       list-style: none;
       padding: 0;
       max-width: 500px;
       margin: 0 auto;
     }
-
     #historico li {
       background: #eee;
       margin-bottom: 5px;
       padding: 8px;
       border-radius: 4px;
     }
-
     .slider-container {
       display: flex;
       align-items: center;
@@ -116,7 +96,9 @@
     <h1>Registro de QR Code - Fábrica</h1>
 
     <div class="top-bar">
-      <input type="text" id="usuario" placeholder="Seu nome" />
+      <select id="usuario">
+        <option value="">Selecione o Funcionário</option>
+      </select>
       <input type="text" id="qrInput" placeholder="Escaneie o QR Code" autofocus />
 
       <div class="slider-container">
@@ -128,15 +110,15 @@
       <button onclick="window.location.href='/registros'">Ver Registros</button>
       <button onclick="window.location.href='/importar'">Importar Carga</button>
       <button onclick="window.location.href='/relatorio?origem=fabrica'">Relatório</button>
+      <button onclick="abrirModalSenha()">Cadastrar Funcionário</button>
+
 
       <button id="cameraButton" title="Escanear QR com Câmera">📷</button>
     </div>
 
     <video id="videoPreview" playsinline></video>
-
     <div id="mensagem"></div>
     <div id="display"></div>
-
     <div id="historico">
       <h3>Últimos 10 QR Codes bipados:</h3>
       <ul id="listaHistorico"></ul>
@@ -146,8 +128,6 @@
   <audio id="sucesso" src="https://www.soundjay.com/buttons/sounds/button-4.mp3"></audio>
   <audio id="erro" src="https://www.soundjay.com/buttons/sounds/button-10.mp3"></audio>
 
-  <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
-
   <script>
     const qrInput = document.getElementById("qrInput");
     const video = document.getElementById("videoPreview");
@@ -155,11 +135,66 @@
     const listaHistorico = document.getElementById("listaHistorico");
     const sucessoAudio = document.getElementById("sucesso");
     const erroAudio = document.getElementById("erro");
+    const usuarioSelect = document.getElementById("usuario");
     let stream;
+    let senhaAutenticada = null;
+    let usuarioAtual = "";
 
-    let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
+    function registrarQRCode(codigo_qr) {
+      const usuario = usuarioSelect.value.trim();
+      const tempo = parseInt(document.getElementById("tempoExibicao").value);
+      if (!codigo_qr || !usuario) {
+        alert("Selecione o funcionário e escaneie o QR Code!");
+        return;
+      }
+
+      const payload = { codigo_qr, usuario };
+      if (!senhaAutenticada || usuario !== usuarioAtual) {
+        const senha = prompt("Digite a senha do funcionário:");
+        if (!senha) return alert("Senha obrigatória.");
+
+        fetch("/verificar_senha", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nome: usuario, senha })
+        })
+        .then(res => {
+          if (!res.ok) throw new Error("Senha incorreta");
+          senhaAutenticada = senha;
+          usuarioAtual = usuario;
+          enviarRegistro(payload);
+        })
+        .catch(() => alert("Senha incorreta."));
+      } else {
+        enviarRegistro(payload);
+      }
+    }
+
+    function enviarRegistro(payload) {
+      const tempo = parseInt(document.getElementById("tempoExibicao").value);
+      exibirDisplay(payload.codigo_qr, tempo);
+
+      fetch("/registrar_qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.mensagem) {
+          document.getElementById("mensagem").textContent = data.mensagem;
+          sucessoAudio.play();
+          atualizarHistorico(payload.codigo_qr);
+        } else {
+          erroAudio.play();
+          document.getElementById("mensagem").textContent = data.erro || "Erro ao registrar.";
+        }
+      })
+      .catch(() => erroAudio.play());
+    }
 
     function atualizarHistorico(qr) {
+      let historico = JSON.parse(localStorage.getItem("historico_qr")) || [];
       historico.unshift(qr);
       if (historico.length > 10) historico.pop();
       localStorage.setItem("historico_qr", JSON.stringify(historico));
@@ -168,85 +203,38 @@
 
     function renderizarHistorico() {
       listaHistorico.innerHTML = "";
-      historico.forEach(qr => {
+      (JSON.parse(localStorage.getItem("historico_qr")) || []).forEach(qr => {
         const li = document.createElement("li");
         li.textContent = qr;
         listaHistorico.appendChild(li);
       });
     }
 
-    function exibirDisplay(texto, tempo) {
-      display.textContent = texto;
-      display.style.display = "flex";
-      document.documentElement.requestFullscreen?.();
-      setTimeout(() => {
-        display.style.display = "none";
-        qrInput.focus();
-      }, tempo);
+    function carregarFuncionarios() {
+      fetch("/listar_funcionarios")
+        .then(res => res.json())
+        .then(lista => {
+          lista.forEach(f => {
+            const opt = document.createElement("option");
+            opt.value = f.nome;
+            opt.textContent = f.nome;
+            usuarioSelect.appendChild(opt);
+          });
+        });
     }
 
-    function registrarQRCode(codigo_qr) {
-      const usuario = document.getElementById("usuario").value.trim();
-      const tempo = parseInt(document.getElementById("tempoExibicao").value);
-      if (!codigo_qr || !usuario) {
-        alert("Preencha o nome e o QR Code!");
-        return;
-      }
+    usuarioSelect.addEventListener("change", () => {
+      senhaAutenticada = null;
+    });
 
-      exibirDisplay(codigo_qr, tempo);
-
-      fetch("/registrar_qr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo_qr, usuario })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.mensagem) {
-          document.getElementById("mensagem").textContent = data.mensagem;
-          sucessoAudio.play();
-          atualizarHistorico(codigo_qr);
-        } else {
-          erroAudio.play();
-          document.getElementById("mensagem").textContent = data.erro || "Erro ao registrar.";
-        }
-      })
-      .catch(() => {
-        erroAudio.play();
-        document.getElementById("mensagem").textContent = "Sem conexão. Salvando offline.";
-        const offline = JSON.parse(localStorage.getItem("offline_qr")) || [];
-        offline.push({ codigo_qr, usuario });
-        localStorage.setItem("offline_qr", JSON.stringify(offline));
-      });
-    }
-
-    qrInput.addEventListener("keypress", function (event) {
-      if (event.key === "Enter") {
-        const codigo_qr = qrInput.value.trim();
-        registrarQRCode(codigo_qr);
+    qrInput.addEventListener("keypress", e => {
+      if (e.key === "Enter") {
+        registrarQRCode(qrInput.value.trim());
         qrInput.value = "";
       }
     });
 
-    function sincronizarOffline() {
-      const offlineData = JSON.parse(localStorage.getItem("offline_qr")) || [];
-      if (offlineData.length === 0) return;
-
-      offlineData.forEach(item => {
-        fetch("/registrar_qr", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(item)
-        })
-        .then(res => res.json())
-        .then(() => {
-          sucessoAudio.play();
-          offlineData.shift();
-          localStorage.setItem("offline_qr", JSON.stringify(offlineData));
-        })
-        .catch(() => erroAudio.play());
-      });
-    }
+    document.getElementById("cameraButton").addEventListener("click", iniciarCamera);
 
     async function iniciarCamera() {
       try {
@@ -284,12 +272,67 @@
       }
     }
 
-    document.getElementById("cameraButton").addEventListener("click", iniciarCamera);
+    function exibirDisplay(texto, tempo) {
+      display.textContent = texto;
+      display.style.display = "flex";
+      document.documentElement.requestFullscreen?.();
+      setTimeout(() => {
+        display.style.display = "none";
+        qrInput.focus();
+      }, tempo);
+    }
 
-    window.onload = () => {
-      renderizarHistorico();
-      sincronizarOffline();
-    };
+  window.onload = () => {
+  carregarFuncionarios();
+  renderizarHistorico();
+  const modal = document.getElementById("modalSenha");
+  if (modal) modal.style.display = "none"; // Garante que esteja fechado ao carregar
+};
+
+
+  function acessarCadastro() {
+    const senha = prompt("Digite a senha para acessar o cadastro de funcionário:");
+    if (senha === "@pcp1234") {
+      window.location.href = "/cadastro_funcionario";
+    } else {
+      alert("Senha incorreta. Acesso negado.");
+    }
+  }
+
+function abrirModalSenha() {
+  document.getElementById("senhaCadastro").value = "";
+  document.getElementById("modalSenha").style.display = "flex";
+}
+
+function fecharModalSenha() {
+  document.getElementById("modalSenha").style.display = "none";
+}
+
+function confirmarSenhaCadastro() {
+  const senha = document.getElementById("senhaCadastro").value;
+  if (senha === "@pcp1234") {
+    window.location.href = "/cadastro_funcionario";
+  } else {
+    alert("Senha incorreta. Acesso negado.");
+    fecharModalSenha();
+  }
+}
+
   </script>
+
+<!-- Modal de senha -->
+<div id="modalSenha" style="display:none; position: fixed; top: 0; left: 0; 
+  width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); 
+  display: flex; align-items: center; justify-content: center; z-index: 1000;">
+  <div style="background: white; padding: 30px; border-radius: 10px; text-align: center;">
+    <h3>Digite a senha para acessar o cadastro:</h3>
+    <input type="password" id="senhaCadastro" placeholder="Senha" style="padding: 10px; width: 200px;" />
+    <div style="margin-top: 20px;">
+      <button onclick="confirmarSenhaCadastro()">Confirmar</button>
+      <button onclick="fecharModalSenha()" style="background-color: #ccc; color: black;">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
