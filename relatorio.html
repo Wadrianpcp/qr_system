@@ -21,31 +21,47 @@
 </head>
 <body>
   <h1>Relatório de Atendimento da Carga</h1>
+
   <div id="usuarioContainer">
     <label>Usuário: <input type="text" id="nomeUsuario" placeholder="Digite seu nome para exportar"></label>
   </div>
+
   <div id="filtros">
-    <label>Obra: <select id="filtroObra"><option value="">Todas</option></select></label>
+    <label>Obra: 
+      <select id="filtroObra">
+        <option value="">Selecione uma Obra</option>
+      </select>
+    </label>
+
     <label for="filtroCodInsumo">COD INSUMO:</label>
     <input type="text" id="filtroCodInsumo" placeholder="Digite o código...">
-    <label>Cargas: <select id="filtroCargas"><option value="">Todas</option></select></label>
-    <label>Status: <select id="filtroStatus">
-      <option value="">Todos</option>
-      <option value="verde">Atendido</option>
-      <option value="amarelo">Parcial</option>
-      <option value="vermelho">Não Atendido</option>
-    </select></label>
+
+    <label>Cargas: 
+      <select id="filtroCargas"><option value="">Todas</option></select>
+    </label>
+
+    <label>Status: 
+      <select id="filtroStatus">
+        <option value="">Todos</option>
+        <option value="verde">Atendido</option>
+        <option value="amarelo">Parcial</option>
+        <option value="vermelho">Não Atendido</option>
+      </select>
+    </label>
   </div>
+
   <div id="resumo">
     <p>Total Atendidos: <span id="resumoVerde">0</span> |
        Não Atendidos: <span id="resumoVermelho">0</span> |
        Total de Itens: <span id="resumoTotal">0</span></p>
   </div>
+
   <div class="btn-container">
     <button onclick="exportarExcel()">Exportar para Excel</button>
     <button onclick="exportarPDF()">Exportar para PDF</button>
     <button id="voltarBtn">Voltar</button>
   </div>
+
   <table>
     <thead>
       <tr>
@@ -54,19 +70,14 @@
       </tr>
     </thead>
     <tbody id="tabelaRelatorio">
-      <tr><td colspan="7">Carregando dados...</td></tr>
+      <tr><td colspan="7">Selecione uma obra para visualizar os dados.</td></tr>
     </tbody>
   </table>
 
-  <script>
+ <script>
   document.getElementById("voltarBtn").addEventListener("click", () => {
-    const params = new URLSearchParams(window.location.search);
-    const origem = params.get("origem");
-    if (origem === "obra") {
-      window.location.href = "/obra";
-    } else {
-      window.location.href = "/";
-    }
+    const origem = new URLSearchParams(window.location.search).get("origem");
+    window.location.href = origem === "obra" ? "/obra" : "/";
   });
 
   function exportarPDF() {
@@ -76,7 +87,6 @@
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-
     doc.text("Relatório de Atendimento da Carga", 14, 15);
 
     const headers = [["COD INSUMO", "PRODUTO", "OBRA", "CARGAS", "TOTAL NECESSÁRIO", "BIPADO FABRICA", "BIPADO OBRA"]];
@@ -87,43 +97,49 @@
       body.push(cells);
     });
 
-    doc.autoTable({
-      head: headers,
-      body: body,
-      startY: 25,
-      margin: { bottom: 20 },
-      styles: { fontSize: 8 }
-    });
-
+    doc.autoTable({ head: headers, body: body, startY: 25, margin: { bottom: 20 }, styles: { fontSize: 8 } });
     doc.text(rodape, 14, doc.internal.pageSize.height - 10);
     doc.save("relatorio_carga.pdf");
   }
 
-  let dadosGlobais = [];
-  function carregarRelatorio() {
-    fetch('/relatorio_diferencas')
+  function preencherObras() {
+    fetch('/obras_disponiveis')
       .then(res => res.json())
-      .then(data => {
-        dadosGlobais = data;
-        preencherFiltros(data);
-        renderizarTabela(data);
-      })
-      .catch((erro) => {
-        document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: ${erro.message}</td></tr>`;
+      .then(obras => {
+        const select = document.getElementById('filtroObra');
+        obras.forEach(o => {
+          const option = document.createElement('option');
+          option.value = o;
+          option.textContent = o;
+          select.appendChild(option);
+        });
       });
   }
 
-  function preencherFiltros(data) {
-    const obras = [...new Set(data.map(d => d.obra))];
-    const cargas = [...new Set(data.map(d => d.cargas))];
-    const obraSelect = document.getElementById('filtroObra');
+  function carregarRelatorioPorObraECarga(obra, carga) {
+    fetch(`/relatorio_diferencas?obra=${encodeURIComponent(obra)}&carga=${encodeURIComponent(carga)}`)
+      .then(res => res.json())
+      .then(data => {
+        renderizarTabela(data);
+      })
+      .catch(err => {
+        document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: ${err.message}</td></tr>`;
+      });
+  }
+
+  function preencherCargas(data) {
     const cargasSelect = document.getElementById('filtroCargas');
-    obras.forEach(o => obraSelect.innerHTML += `<option value="${o}">${o}</option>`);
-    cargas.forEach(c => cargasSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    cargasSelect.innerHTML = `<option value="">Todas</option>`;
+    const cargas = [...new Set(data.map(d => d.cargas))];
+    cargas.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      cargasSelect.appendChild(opt);
+    });
   }
 
   function renderizarTabela(data) {
-    const filtroObra = document.getElementById('filtroObra').value;
     const filtroCodInsumo = document.getElementById('filtroCodInsumo').value.toLowerCase();
     const filtroCargas = document.getElementById('filtroCargas').value;
     const filtroStatus = document.getElementById('filtroStatus').value;
@@ -131,18 +147,18 @@
     tabela.innerHTML = '';
 
     let verde = 0, vermelho = 0;
+
     const filtrado = data.filter(item => {
       let status;
       if (item.bipado_fabrica > 0 && item.bipado_obra > 0) status = 'verde';
-      else if (item.bipado_fabrica > 0 && item.bipado_obra == 0) status = 'amarelo';
+      else if (item.bipado_fabrica > 0) status = 'amarelo';
       else status = 'vermelho';
 
-      const condObra = !filtroObra || item.obra === filtroObra;
       const condCodInsumo = !filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo);
       const condCargas = !filtroCargas || item.cargas === filtroCargas;
       const condStatus = !filtroStatus || status === filtroStatus;
 
-      return condObra && condCodInsumo && condCargas && condStatus;
+      return condCodInsumo && condCargas && condStatus;
     });
 
     if (filtrado.length === 0) {
@@ -159,6 +175,7 @@
       } else {
         classe = 'status-vermelho'; vermelho++;
       }
+
       tabela.innerHTML += `
         <tr class="${classe}">
           <td>${item.cod_insumo}</td>
@@ -168,8 +185,7 @@
           <td>${item.total_necessario}</td>
           <td>${item.bipado_fabrica}</td>
           <td>${item.bipado_obra}</td>
-        </tr>
-      `;
+        </tr>`;
     });
 
     document.getElementById('resumoVerde').textContent = verde;
@@ -177,13 +193,59 @@
     document.getElementById('resumoTotal').textContent = filtrado.length;
   }
 
-  document.getElementById('filtroObra').addEventListener('change', () => renderizarTabela(dadosGlobais));
-  document.getElementById('filtroCargas').addEventListener('change', () => renderizarTabela(dadosGlobais));
-  document.getElementById('filtroStatus').addEventListener('change', () => renderizarTabela(dadosGlobais));
-  document.getElementById('filtroCodInsumo').addEventListener('input', () => renderizarTabela(dadosGlobais));
+  function verificarFiltrosECarregar() {
+    const obra = document.getElementById('filtroObra').value;
+    const carga = document.getElementById('filtroCargas').value;
 
-  carregarRelatorio();
-  </script>
+    const status = document.getElementById('filtroStatus');
+    const codInsumo = document.getElementById('filtroCodInsumo');
+
+    const habilitar = obra && carga;
+    status.disabled = !habilitar;
+    codInsumo.disabled = !habilitar;
+
+    if (habilitar) {
+      carregarRelatorioPorObraECarga(obra, carga);
+    } else {
+      document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Selecione uma obra e uma carga para visualizar os dados.</td></tr>';
+    }
+  }
+
+  document.getElementById('filtroObra').addEventListener('change', (e) => {
+    document.getElementById('filtroCargas').value = "";
+    document.getElementById('filtroStatus').value = "";
+    document.getElementById('filtroCodInsumo').value = "";
+    document.getElementById('filtroStatus').disabled = true;
+    document.getElementById('filtroCodInsumo').disabled = true;
+
+    const obra = e.target.value;
+
+    if (obra) {
+  fetch(`/cargas_disponiveis?obra=${encodeURIComponent(obra)}`)
+    .then(res => res.json())
+    .then(cargas => {
+      const cargasSelect = document.getElementById('filtroCargas');
+      cargasSelect.innerHTML = '<option value="">Selecione uma Carga</option>';
+      cargas.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        cargasSelect.appendChild(opt);
+      });
+    });
+}
+
+
+    verificarFiltrosECarregar();
+  });
+
+  document.getElementById('filtroCargas').addEventListener('change', verificarFiltrosECarregar);
+  document.getElementById('filtroStatus').addEventListener('change', verificarFiltrosECarregar);
+  document.getElementById('filtroCodInsumo').addEventListener('input', verificarFiltrosECarregar);
+
+  preencherObras();
+</script>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </body>
