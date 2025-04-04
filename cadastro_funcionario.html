@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cadastro de Funcionário</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #f5f5f5;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    form {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 400px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #1976d2;
+      color: white;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    #mensagem {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    .voltar-btn {
+      margin-top: 20px;
+      background-color: #555;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Cadastro de Funcionário</h1>
+
+  <form id="formCadastro">
+    <input type="text" id="nome" placeholder="Nome do Funcionário" required />
+    <input type="password" id="senha" placeholder="Senha" required />
+    <button type="submit">Cadastrar</button>
+    <div id="mensagem"></div>
+  </form>
+
+  <button class="voltar-btn" onclick="window.location.href='/'">Voltar</button>
+
+  <script>
+    document.getElementById("formCadastro").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const nome = document.getElementById("nome").value.trim();
+      const senha = document.getElementById("senha").value.trim();
+
+      if (!nome || !senha) {
+        document.getElementById("mensagem").textContent = "Preencha todos os campos.";
+        document.getElementById("mensagem").style.color = "red";
+        return;
+      }
+
+      fetch("/cadastrar_funcionario", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome, senha })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.mensagem) {
+          document.getElementById("mensagem").textContent = data.mensagem;
+          document.getElementById("mensagem").style.color = "green";
+          document.getElementById("formCadastro").reset();
+        } else {
+          document.getElementById("mensagem").textContent = data.erro || "Erro no cadastro.";
+          document.getElementById("mensagem").style.color = "red";
+        }
+      })
+      .catch(() => {
+        document.getElementById("mensagem").textContent = "Erro ao se conectar com o servidor.";
+        document.getElementById("mensagem").style.color = "red";
+      });
+    });
+  </script>
+</body>
+</html>
