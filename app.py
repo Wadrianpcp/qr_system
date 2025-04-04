@@ -180,8 +180,12 @@ def listar_carga():
 
     registros_formatados = [dict(zip(colunas, linha)) for linha in dados]
     return jsonify(registros_formatados)
-@app.route('/relatorio_diferencas', methods=['GET'])
+
+@app.route('/relatorio_diferencas')
 def relatorio_diferencas():
+    obra_filtro = request.args.get("obra")
+    carga_filtro = request.args.get("carga")
+
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -191,24 +195,28 @@ def relatorio_diferencas():
     cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
     bipado_obra_dict = dict(cur.fetchall())
 
-    cur.execute("SELECT cod_insumo, produto, uhs, obra, cargas, total, pav FROM lista_de_carga ORDER BY id")
+    if obra_filtro and carga_filtro:
+        cur.execute("""
+            SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
+            FROM lista_de_carga
+            WHERE obra = %s AND cargas = %s
+            ORDER BY id
+        """, (obra_filtro, carga_filtro))
+    else:
+        return jsonify([])  # Nenhum dado se os dois filtros não estiverem presentes
+
     lista = cur.fetchall()
     colunas = [desc[0] for desc in cur.description]
+    cur.close()
+    conn.close()
 
     relatorio = []
     for linha in lista:
         registro = dict(zip(colunas, linha))
         cod_insumo = registro["cod_insumo"]
         total = int(registro["total"])
-
-        # Distribuir bipados disponíveis (reduzindo conforme usa)
-        disponivel_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
-        usado_fabrica = min(disponivel_fabrica, total)
-        bipado_fabrica_dict[cod_insumo] = disponivel_fabrica - usado_fabrica
-
-        disponivel_obra = bipado_obra_dict.get(cod_insumo, 0)
-        usado_obra = min(disponivel_obra, total)
-        bipado_obra_dict[cod_insumo] = disponivel_obra - usado_obra
+        usado_fabrica = min(bipado_fabrica_dict.get(cod_insumo, 0), total)
+        usado_obra = min(bipado_obra_dict.get(cod_insumo, 0), total)
 
         relatorio.append({
             "cod_insumo": cod_insumo,
@@ -220,9 +228,8 @@ def relatorio_diferencas():
             "bipado_obra": usado_obra
         })
 
-    cur.close()
-    conn.close()
     return jsonify(relatorio)
+
 
 
 @app.route('/registrar_qr_obra', methods=['POST'])
@@ -328,6 +335,42 @@ def listar_funcionarios():
     conn.close()
     return jsonify([{"nome": f[0]} for f in funcionarios])
 
+from flask import jsonify
+from sqlalchemy import text
+
+@app.route('/obras_disponiveis')
+def obras_disponiveis():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT DISTINCT obra FROM lista_de_carga ORDER BY obra")
+        resultados = cur.fetchall()
+        obras = [row[0] for row in resultados]
+        return jsonify(obras)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/cargas_disponiveis')
+def cargas_disponiveis():
+    obra = request.args.get("obra")
+    if not obra:
+        return jsonify([])
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT DISTINCT cargas FROM lista_de_carga WHERE obra = %s ORDER BY cargas", (obra,))
+        resultados = cur.fetchall()
+        cargas = [row[0] for row in resultados]
+        return jsonify(cargas)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 
 if __name__ == '__main__':
