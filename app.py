@@ -19,6 +19,10 @@ def index():
 def etiquetas():
     return send_file('etiquetas.html')
 
+@app.route('/cadastro_funcionario')
+def pagina_cadastro_funcionario():
+    return send_file('cadastro_funcionario.html')
+
 @app.route('/obra')
 def obra():
     return send_file('obra.html')
@@ -267,6 +271,64 @@ def gerar_etiquetas():
     conn.close()
     registros = [dict(zip(colunas, linha)) for linha in dados]
     return render_template("etiquetas.html", registros=registros)
+
+from werkzeug.security import generate_password_hash, check_password_hash
+
+@app.route('/cadastrar_funcionario', methods=['POST'])
+def cadastrar_funcionario():
+    data = request.json
+    nome = data.get('nome')
+    senha = data.get('senha')
+
+    if not nome or not senha:
+        return jsonify({"erro": "Nome e senha são obrigatórios"}), 400
+
+    senha_hash = generate_password_hash(senha)
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO funcionarios (nome, senha) VALUES (%s, %s)", (nome, senha_hash))
+        conn.commit()
+        return jsonify({"mensagem": "Funcionário cadastrado com sucesso!"}), 201
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        return jsonify({"erro": "Funcionário já existe."}), 409
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/verificar_senha', methods=['POST'])
+def verificar_senha():
+    data = request.json
+    nome = data.get('nome')
+    senha = data.get('senha')
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT senha FROM funcionarios WHERE nome = %s", (nome,))
+    resultado = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if resultado and check_password_hash(resultado[0], senha):
+        return jsonify({"valido": True})
+    else:
+        return jsonify({"valido": False}), 401
+
+@app.route('/listar_funcionarios', methods=['GET'])
+def listar_funcionarios():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT nome FROM funcionarios ORDER BY nome")
+    funcionarios = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([{"nome": f[0]} for f in funcionarios])
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
