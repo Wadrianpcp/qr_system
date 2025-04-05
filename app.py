@@ -72,6 +72,8 @@ def registrar_qr():
         cur.close()
         conn.close()
 
+
+
 @app.route('/listar_qr', methods=['GET'])
 def listar_qr():
     conn = get_db_connection()
@@ -186,50 +188,141 @@ def relatorio_diferencas():
     obra_filtro = request.args.get("obra")
     carga_filtro = request.args.get("carga")
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    if not obra_filtro or not carga_filtro:
+        return jsonify([])
 
-    cur.execute("SELECT codigo_qr, COUNT(*) FROM registros_qr GROUP BY codigo_qr")
-    bipado_fabrica_dict = dict(cur.fetchall())
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Primeiro, buscar somente os registros da obra e carga selecionados
+                cur.execute("""
+                    SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
+                    FROM lista_de_carga
+                    WHERE obra = %s AND cargas = %s
+                    ORDER BY id
+                """, (obra_filtro, carga_filtro))
+                lista = cur.fetchall()
+                colunas = [desc[0] for desc in cur.description]
+                registros = [dict(zip(colunas, linha)) for linha in lista]
 
-    cur.execute("SELECT codigo_qr, COUNT(*) FROM recebimento_obra GROUP BY codigo_qr")
-    bipado_obra_dict = dict(cur.fetchall())
+                if not registros:
+                    return jsonify([])
 
-    if obra_filtro and carga_filtro:
-        cur.execute("""
-            SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
-            FROM lista_de_carga
-            WHERE obra = %s AND cargas = %s
-            ORDER BY id
-        """, (obra_filtro, carga_filtro))
-    else:
-        return jsonify([])  # Nenhum dado se os dois filtros não estiverem presentes
+                # Obter os cod_insumo únicos dessa carga
+                cods_insumo = tuple(set(r["cod_insumo"] for r in registros))
 
-    lista = cur.fetchall()
-    colunas = [desc[0] for desc in cur.description]
-    cur.close()
-    conn.close()
+                # Ajustar SQL dinamicamente para usar o IN apenas se necessário
+                placeholder = ','.join(['%s'] * len(cods_insumo))
 
-    relatorio = []
-    for linha in lista:
-        registro = dict(zip(colunas, linha))
-        cod_insumo = registro["cod_insumo"]
-        total = int(registro["total"])
-        usado_fabrica = min(bipado_fabrica_dict.get(cod_insumo, 0), total)
-        usado_obra = min(bipado_obra_dict.get(cod_insumo, 0), total)
+                # Buscar bipados apenas desses cod_insumo
+                cur.execute(f"""
+                    SELECT codigo_qr, COUNT(*) 
+                    FROM registros_qr 
+                    WHERE codigo_qr IN ({placeholder})
+                    GROUP BY codigo_qr
+                """, cods_insumo)
+                bipado_fabrica_dict = dict(cur.fetchall())
 
-        relatorio.append({
-            "cod_insumo": cod_insumo,
-            "produto": registro["produto"],
-            "obra": registro["obra"],
-            "cargas": registro["cargas"],
-            "total_necessario": total,
-            "bipado_fabrica": usado_fabrica,
-            "bipado_obra": usado_obra
-        })
+                cur.execute(f"""
+                    SELECT codigo_qr, COUNT(*) 
+                    FROM recebimento_obra 
+                    WHERE codigo_qr IN ({placeholder})
+                    GROUP BY codigo_qr
+                """, cods_insumo)
+                bipado_obra_dict = dict(cur.fetchall())
 
-    return jsonify(relatorio)
+        # Processar relatório (como antes)
+        relatorio = []
+        for registro in registros:
+            cod_insumo = registro["cod_insumo"]
+            total = int(registro["total"])
 
+            disponivel_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
+            usado_fabrica = min(disponivel_fabrica, total)
+            bipado_fabrica_dict[cod_insumo] = disponivel_fabrica - usado_fabrica
+
+            disponivel_obra = bipado_obra_dict.get(cod_insumo, 0)
+            usado_obra = min(disponivel_obra, total)
+            bipado_obra_dict[cod_insumo] = disponivel_obra - usado_obra
+
+            relatorio.append({
+                "cod_insumo": cod_insumo,
+                "produto": registro["produto"],
+                "obra": registro["obra"],
+                "cargas": registro["cargas"],
+                "total_necessario": total,
+                "bipado_fabrica": usado_fabrica,
+                "bipado_obra": usado_obra
+            })
+
+        return jsonify(relatorio)
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+def relatorio_diferencas_backend(obra_filtro, carga_filtro):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
+                    FROM lista_de_carga
+                    WHERE obra = %s AND cargas = %s
+                    ORDER BY id
+                """, (obra_filtro, carga_filtro))
+                lista = cur.fetchall()
+                colunas = [desc[0] for desc in cur.description]
+                registros = [dict(zip(colunas, linha)) for linha in lista]
+
+                if not registros:
+                    return jsonify([])
+
+                cods_insumo = tuple(set(r["cod_insumo"] for r in registros))
+                placeholder = ','.join(['%s'] * len(cods_insumo))
+
+                cur.execute(f"""
+                    SELECT codigo_qr, COUNT(*) 
+                    FROM registros_qr 
+                    WHERE codigo_qr IN ({placeholder})
+                    GROUP BY codigo_qr
+                """, cods_insumo)
+                bipado_fabrica_dict = dict(cur.fetchall())
+
+                cur.execute(f"""
+                    SELECT codigo_qr, COUNT(*) 
+                    FROM recebimento_obra 
+                    WHERE codigo_qr IN ({placeholder})
+                    GROUP BY codigo_qr
+                """, cods_insumo)
+                bipado_obra_dict = dict(cur.fetchall())
+
+        relatorio = []
+        for registro in registros:
+            cod_insumo = registro["cod_insumo"]
+            total = int(registro["total"])
+
+            disponivel_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
+            usado_fabrica = min(disponivel_fabrica, total)
+            bipado_fabrica_dict[cod_insumo] = disponivel_fabrica - usado_fabrica
+
+            disponivel_obra = bipado_obra_dict.get(cod_insumo, 0)
+            usado_obra = min(disponivel_obra, total)
+            bipado_obra_dict[cod_insumo] = disponivel_obra - usado_obra
+
+            relatorio.append({
+                "cod_insumo": cod_insumo,
+                "produto": registro["produto"],
+                "obra": registro["obra"],
+                "cargas": registro["cargas"],
+                "total_necessario": total,
+                "bipado_fabrica": usado_fabrica,
+                "bipado_obra": usado_obra
+            })
+
+        return jsonify(relatorio)
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 
 @app.route('/registrar_qr_obra', methods=['POST'])
@@ -252,6 +345,8 @@ def registrar_qr_obra():
     finally:
         cur.close()
         conn.close()
+
+
 
 @app.route('/excluir_qr_obra/<int:id>', methods=['DELETE'])
 def excluir_qr_obra(id):
@@ -371,6 +466,70 @@ def cargas_disponiveis():
     finally:
         cur.close()
         conn.close()
+
+def relatorio_diferencas_interno(obra_filtro, carga_filtro):
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT cod_insumo, produto, uhs, obra, cargas, total, pav
+                    FROM lista_de_carga
+                    WHERE obra = %s AND cargas = %s
+                    ORDER BY id
+                """, (obra_filtro, carga_filtro))
+                lista = cur.fetchall()
+                colunas = [desc[0] for desc in cur.description]
+                registros = [dict(zip(colunas, linha)) for linha in lista]
+
+                if not registros:
+                    return jsonify([])
+
+                cods_insumo = tuple(set(r["cod_insumo"] for r in registros))
+                placeholder = ','.join(['%s'] * len(cods_insumo))
+
+                cur.execute(f"""
+                    SELECT codigo_qr, COUNT(*) 
+                    FROM registros_qr 
+                    WHERE codigo_qr IN ({placeholder})
+                    GROUP BY codigo_qr
+                """, cods_insumo)
+                bipado_fabrica_dict = dict(cur.fetchall())
+
+                cur.execute(f"""
+                    SELECT codigo_qr, COUNT(*) 
+                    FROM recebimento_obra 
+                    WHERE codigo_qr IN ({placeholder})
+                    GROUP BY codigo_qr
+                """, cods_insumo)
+                bipado_obra_dict = dict(cur.fetchall())
+
+        relatorio = []
+        for registro in registros:
+            cod_insumo = registro["cod_insumo"]
+            total = int(registro["total"])
+
+            disponivel_fabrica = bipado_fabrica_dict.get(cod_insumo, 0)
+            usado_fabrica = min(disponivel_fabrica, total)
+            bipado_fabrica_dict[cod_insumo] = disponivel_fabrica - usado_fabrica
+
+            disponivel_obra = bipado_obra_dict.get(cod_insumo, 0)
+            usado_obra = min(disponivel_obra, total)
+            bipado_obra_dict[cod_insumo] = disponivel_obra - usado_obra
+
+            relatorio.append({
+                "cod_insumo": cod_insumo,
+                "produto": registro["produto"],
+                "obra": registro["obra"],
+                "cargas": registro["cargas"],
+                "total_necessario": total,
+                "bipado_fabrica": usado_fabrica,
+                "bipado_obra": usado_obra
+            })
+
+        return jsonify(relatorio)
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
 
 if __name__ == '__main__':
