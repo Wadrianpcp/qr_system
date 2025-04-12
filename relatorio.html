@@ -36,7 +36,7 @@
     <input type="text" id="filtroCodInsumo" placeholder="Digite o código...">
 
     <label>Cargas: 
-      <select id="filtroCargas"><option value="">Todas</option></select>
+      <select id="filtroCargas" multiple size="5" style="min-width: 200px;"></select>
     </label>
 
     <label>Status: 
@@ -109,9 +109,10 @@
     function iniciarAtualizacao() {
       intervaloId = setInterval(() => {
         const obra = document.getElementById('filtroObra').value;
-        const carga = document.getElementById('filtroCargas').value;
-        if (obra && carga && atualizar) {
-          carregarRelatorioPorObraECarga(obra, carga);
+        const cargaSelect = document.getElementById('filtroCargas');
+const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => opt.value).join(',');
+        if (obra && cargasSelecionadas.length > 0 && atualizar) {
+          carregarRelatorioPorObraECarga(obra, cargasSelecionadas);
         }
       }, intervaloAtualizacao);
     }
@@ -148,8 +149,8 @@
         });
     }
 
-    function carregarRelatorioPorObraECarga(obra, carga) {
-      fetch(`/relatorio_diferencas?obra=${encodeURIComponent(obra)}&carga=${encodeURIComponent(carga)}`)
+       function carregarRelatorioPorObraECarga(obra, cargas) {
+       fetch(`/relatorio_diferencas?obra=${encodeURIComponent(obra)}&cargas=${encodeURIComponent(cargas)}`)
         .then(res => res.json())
         .then(data => renderizarTabela(data))
         .catch(err => {
@@ -158,8 +159,15 @@
     }
 
     function renderizarTabela(data) {
+  console.log("Dados recebidos:", data); // debug opcional
+
+  // Verifica se os dados recebidos são realmente uma lista (array)
+  if (!Array.isArray(data)) {
+    document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: dados inválidos do servidor</td></tr>`;
+    return;
+  }
       const filtroCodInsumo = document.getElementById('filtroCodInsumo').value.toLowerCase();
-      const filtroCargas = document.getElementById('filtroCargas').value;
+      const filtroCargasSelecionadas = Array.from(document.getElementById('filtroCargas').selectedOptions).map(opt => opt.value);
       const filtroStatus = document.getElementById('filtroStatus').value;
       const tabela = document.getElementById('tabelaRelatorio');
       tabela.innerHTML = '';
@@ -170,7 +178,7 @@
         let status = item.bipado_fabrica > 0 && item.bipado_obra > 0 ? 'verde' :
                      item.bipado_fabrica > 0 ? 'amarelo' : 'vermelho';
         return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo)) &&
-               (!filtroCargas || item.cargas === filtroCargas) &&
+               (!filtroCargasSelecionadas.length || filtroCargasSelecionadas.includes(item.cargas)) &&
                (!filtroStatus || status === filtroStatus);
       });
 
@@ -211,16 +219,17 @@
 
     function verificarFiltrosECarregar() {
       const obra = document.getElementById('filtroObra').value;
-      const carga = document.getElementById('filtroCargas').value;
+      const cargaSelect = document.getElementById('filtroCargas');
+      const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => opt.value);
       const status = document.getElementById('filtroStatus');
       const codInsumo = document.getElementById('filtroCodInsumo');
-      const habilitar = obra && carga;
+      const habilitar = obra && cargasSelecionadas.length > 0;
       status.disabled = !habilitar;
       codInsumo.disabled = !habilitar;
 
-      if (habilitar) {
-        carregarRelatorioPorObraECarga(obra, carga);
-      } else {
+      if (obra && cargasSelecionadas.length > 0) {
+  carregarRelatorioPorObraECarga(obra, cargasSelecionadas.join(','));
+} else {
         document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Selecione uma obra e uma carga para visualizar os dados.</td></tr>';
       }
     }
