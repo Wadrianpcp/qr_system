@@ -1,26 +1,141 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
   <meta charset="UTF-8">
   <title>Relatório de Atendimento da Carga</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Roboto', sans-serif; margin: 20px; text-align: center; }
-    #filtros, #usuarioContainer { margin-bottom: 20px; }
-    select, input[type="text"], input[type="number"] { padding: 6px; margin: 0 10px; }
-    #resumo { margin-bottom: 20px; font-weight: bold; }
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background-color: #f0f0f0; }
-    .status-verde { background-color: #d4edda; }
-    .status-amarelo { background-color: #fff3cd; }
-    .status-vermelho { background-color: #f8d7da; }
-    .btn-container { margin-top: 20px; }
-    button { padding: 10px 20px; margin: 5px; cursor: pointer; font-weight: bold; }
-    #autoUpdateControls { margin-top: 10px; }
-  </style>
+ <style>
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+
+  body {
+    font-family: 'Roboto', sans-serif;
+    margin: 20px;
+    text-align: center;
+  }
+
+  #filtros, #usuarioContainer {
+    margin-bottom: 20px;
+  }
+
+  select, input[type="text"], input[type="number"] {
+    padding: 6px;
+    margin: 0 10px;
+  }
+
+  #resumo {
+    margin-bottom: 20px;
+    font-weight: bold;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  }
+
+  th, td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: center;
+  }
+
+  th {
+    background-color: #f0f0f0;
+  }
+
+  .status-verde { background-color: #d4edda; }
+  .status-amarelo { background-color: #fff3cd; }
+  .status-vermelho { background-color: #f8d7da; }
+
+  .btn-container { margin-top: 20px; }
+
+  button {
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px;
+    background-color: #1976d2;
+    color: white;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease, transform 0.2s ease;
+  }
+
+  button:hover {
+    background-color: #1565c0;
+    transform: scale(1.03);
+  }
+
+  button:active {
+    transform: scale(0.97);
+  }
+
+  #graficoModal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: white;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+  }
+
+  #graficoModal h2 {
+    margin-bottom: 10px;
+    font-size: 24px;
+  }
+
+#graficoModal canvas {
+  background-color: #fafafa;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+  #graficoModal canvas {
+    max-width: 90vw;
+    max-height: 70vh;
+    width: 100%;
+    height: auto;
+  }
+
+  @media (max-width: 600px) {
+    canvas {
+      width: 90vw !important;
+      height: auto !important;
+    }
+
+    #containerGraficos {
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+</style>
 </head>
 <body>
+<div id="loading" style="display:none; margin-top: 20px;">
+  <div style="display:inline-block; width: 40px; height: 40px; border: 4px solid #ccc; border-top: 4px solid #1976d2; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+  <p>Carregando relatório...</p>
+</div>
+
   <h1>Relatório de Atendimento da Carga</h1>
 
   <div id="usuarioContainer">
@@ -58,20 +173,66 @@
   </p>
 </div>
 
-  </div>
-
   <div class="btn-container">
-    <button onclick="exportarExcel()">Exportar para Excel</button>
-    <button onclick="exportarPDF()">Exportar para PDF</button>
-    <button id="voltarBtn">Voltar</button>
-  </div>
+  <button id="btnGerarRelatorio">Gerar Relatório</button>
+  <button onclick="document.getElementById('graficoModal').style.display='block'; atualizarGraficoPizza();">Ver Gráfico</button>
+  <button onclick="exportarExcel()">Exportar para Excel</button>
+  <button onclick="exportarPDF()">Exportar para PDF</button>
+  <button id="voltarBtn">Voltar</button>
+</div>
+
 
   <div id="autoUpdateControls">
     <button id="toggleAtualizacao">Desligar Atualização Automática</button>
     <label>Intervalo (seg): <input type="number" id="intervaloTempo" value="5" min="1" style="width: 60px;"></label>
-  </div>
 
+
+<div id="graficoModal" style="
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: white;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+">
+
+<h2 id="tituloGraficoDinamico" style="font-size: 24px; margin-bottom: 10px;">Resumo Gráfico de Atendimento</h2>
+<p id="resumoGraficos" style="font-size: 16px; margin-bottom: 20px; font-weight: bold;"></p>
+
+<div style="margin-bottom: 10px;">
+  <button onclick="exibirGrafico('ambos')">Mostrar Ambos</button>
+  <button onclick="exibirGrafico('fabrica')">Mostrar Fábrica</button>
+  <button onclick="exibirGrafico('obra')">Mostrar Obra</button>
+</div>
+
+
+  <div id="containerGraficos" style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;">
+  <div id="graficoFabricaContainer">
+    <h3>Fábrica</h3>
+    <canvas id="graficoFabrica" width="440" height="450"></canvas>
+  </div>
+  <div id="graficoObraContainer">
+    <h3>Obra</h3>
+    <canvas id="graficoObra" width="440" height="450"></canvas>
+  </div>
+</div>
+
+  <button onclick="document.getElementById('graficoModal').style.display='none'" style="margin-top: 20px;">Fechar</button>
+</div>
+
+<div id="mensagemInicial">Clique em <strong>Gerar Relatório</strong> após selecionar uma obra e carga.</div>
   <table>
+
+
     <thead>
       <tr>
         <th>COD INSUMO</th><th>PRODUTO</th><th>OBRA</th><th>CARGAS</th>
@@ -83,7 +244,176 @@
     </tbody>
   </table>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+
   <script>
+
+function exibirGrafico(tipo) {
+  const fabrica = document.getElementById('graficoFabricaContainer');
+  const obra = document.getElementById('graficoObraContainer');
+
+  if (tipo === 'fabrica') {
+    fabrica.style.display = 'block';
+    obra.style.display = 'none';
+  } else if (tipo === 'obra') {
+    fabrica.style.display = 'none';
+    obra.style.display = 'block';
+  } else {
+    fabrica.style.display = 'block';
+    obra.style.display = 'block';
+  }
+}
+
+
+let chartFabrica, chartObra;
+
+let relatorioGerado = false;
+
+
+function atualizarGraficoPizza() {
+  
+
+
+  const obra = document.getElementById('filtroObra').value;
+  const cargasSelecionadas = Array.from(document.getElementById('filtroCargas').selectedOptions).map(opt => opt.value);
+  const titulo = document.getElementById('tituloGraficoDinamico');
+  titulo.textContent = `Resumo Gráfico: ${obra} | Carga(s): ${cargasSelecionadas.join(', ')}`;
+  if (!obra || cargasSelecionadas.length === 0) return;
+
+  fetch(`/relatorio_diferencas?obra=${encodeURIComponent(obra)}&cargas=${encodeURIComponent(cargasSelecionadas.join(","))}`)
+    .then(res => res.json())
+    .then(data => {
+      let total = 0;
+      let bipadoFabrica = 0;
+      let bipadoObra = 0;
+
+      data.forEach(item => {
+        total += parseInt(item.total_necessario);
+        bipadoFabrica += parseInt(item.bipado_fabrica);
+        bipadoObra += parseInt(item.bipado_obra);
+      });
+
+document.getElementById('resumoGraficos').textContent = 
+  `Total Carga: ${total} | Total bipado fábrica: ${bipadoFabrica} | Total bipado obra: ${bipadoObra}`;
+
+
+      const naoBipadoFabrica = total - bipadoFabrica;
+      const naoBipadoObra = total - bipadoObra;
+
+      const dadosFabrica = [bipadoFabrica, naoBipadoFabrica];
+      const dadosObra = [bipadoObra, naoBipadoObra];
+
+      const labels = ['Bipado', 'Não Bipado'];
+      const cores = ['rgba(255, 206, 86, 0.7)', 'rgba(255, 99, 132, 0.7)'];
+
+      // Atualiza ou cria gráfico da fábrica
+      if (chartFabrica) {
+        chartFabrica.data.datasets[0].data = dadosFabrica;
+        chartFabrica.update();
+let lastFabrica = [], lastObra = [];
+
+function arraysIguais(a, b) {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+      } else {
+        chartFabrica = new Chart(document.getElementById('graficoFabrica').getContext('2d'), {
+          type: 'pie',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: dadosFabrica,
+              backgroundColor: cores
+            }]
+          },
+          options: {
+            plugins: {
+              datalabels: {
+formatter: (value, context) => {
+  const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+  const percent = ((value / total) * 100).toFixed(0);
+  return `${percent}% (${value})`;
+},
+
+                backgroundColor: '#444',
+                color: 'white',
+                font: {
+                  weight: 'bold',
+                  size: 14
+                },
+                borderRadius: 4,
+                padding: 6
+              },
+              legend: {
+                position: 'bottom'
+              }
+            }
+          },
+          plugins: [ChartDataLabels]
+        });
+      }
+
+      // Atualiza ou cria gráfico da obra
+      if (chartObra) {
+        chartObra.data.datasets[0].data = dadosObra;
+        chartObra.update();
+let lastFabrica = [], lastObra = [];
+
+function arraysIguais(a, b) {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+      } else {
+        chartObra = new Chart(document.getElementById('graficoObra').getContext('2d'), {
+          type: 'pie',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: dadosObra,
+              backgroundColor: cores
+            }]
+          },
+          options: {
+            plugins: {
+              datalabels: {
+formatter: (value, context) => {
+  const total = context.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+  const percent = ((value / total) * 100).toFixed(0);
+  return `${percent}% (${value})`;
+},
+
+                backgroundColor: '#444',
+                color: 'white',
+                font: {
+                  weight: 'bold',
+                  size: 14
+                },
+                borderRadius: 4,
+                padding: 6
+              },
+              legend: {
+                position: 'bottom'
+              }
+            }
+          },
+          plugins: [ChartDataLabels]
+        });
+      }
+    });
+}
+
+  // Atualização automática do gráfico enquanto estiver aberto
+  setInterval(() => {
+    if (document.getElementById('graficoModal').style.display === 'block') {
+      atualizarGraficoPizza();
+chartFabrica.options.animation = false;
+chartObra.options.animation = false;
+
+    }
+  }, 10000);
+
     let intervaloAtualizacao = 5000;
     let atualizar = true;
     let intervaloId;
@@ -111,7 +441,7 @@
         const obra = document.getElementById('filtroObra').value;
         const cargaSelect = document.getElementById('filtroCargas');
 const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => opt.value).join(',');
-        if (obra && cargasSelecionadas.length > 0 && atualizar) {
+        if (relatorioGerado && obra && cargasSelecionadas.length > 0 && atualizar) {
           carregarRelatorioPorObraECarga(obra, cargasSelecionadas);
         }
       }, intervaloAtualizacao);
@@ -149,16 +479,31 @@ const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => op
         });
     }
 
-       function carregarRelatorioPorObraECarga(obra, cargas) {
-       fetch(`/relatorio_diferencas?obra=${encodeURIComponent(obra)}&cargas=${encodeURIComponent(cargas)}`)
-        .then(res => res.json())
-        .then(data => renderizarTabela(data))
-        .catch(err => {
-          document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: ${err.message}</td></tr>`;
-        });
-    }
+function carregarRelatorioPorObraECarga(obra, cargas) {
+  document.getElementById('loading').style.display = 'block';
+
+  fetch(`/relatorio_diferencas?obra=${encodeURIComponent(obra)}&cargas=${encodeURIComponent(cargas)}`)
+    .then(res => res.json())
+    .then(data => {
+  renderizarTabela(data);
+  // Aguarda o navegador renderizar a tabela antes de ocultar o loading
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      document.getElementById('loading').style.display = 'none';
+    }, 50); // pequena pausa para garantir renderização
+  });
+})
+
+    .catch(err => {
+      document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: ${err.message}</td></tr>`;
+      document.getElementById('loading').style.display = 'none';
+    });
+}
+
 
     function renderizarTabela(data) {
+document.getElementById('mensagemInicial').style.display = 'none';
+
   console.log("Dados recebidos:", data); // debug opcional
 
   // Verifica se os dados recebidos são realmente uma lista (array)
@@ -213,7 +558,9 @@ const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => op
 
       const evolucao = totalCarga > 0 ? ((totalBipadoFabrica / totalCarga) * 100).toFixed(0) + "%" : "0%";
       document.getElementById('evolucaoCarga').textContent = evolucao;
-      
+      document.getElementById('filtroStatus').disabled = false;
+      document.getElementById('filtroCodInsumo').disabled = false;
+
 
     }
 
@@ -227,14 +574,12 @@ const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => op
       status.disabled = !habilitar;
       codInsumo.disabled = !habilitar;
 
-      if (obra && cargasSelecionadas.length > 0) {
-  carregarRelatorioPorObraECarga(obra, cargasSelecionadas.join(','));
-} else {
+     if (!(obra && cargasSelecionadas.length > 0)) {
+
         document.getElementById('tabelaRelatorio').innerHTML = '<tr><td colspan="7">Selecione uma obra e uma carga para visualizar os dados.</td></tr>';
       }
     }
-
-    document.getElementById('filtroObra').addEventListener('change', e => {
+document.getElementById('filtroObra').addEventListener('change', e => {
       const obra = e.target.value;
       document.getElementById('filtroCargas').value = "";
       document.getElementById('filtroStatus').value = "";
@@ -257,18 +602,36 @@ const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => op
           });
       }
 
-      verificarFiltrosECarregar();
     });
 
-    document.getElementById('filtroCargas').addEventListener('change', verificarFiltrosECarregar);
-    document.getElementById('filtroStatus').addEventListener('change', verificarFiltrosECarregar);
-    document.getElementById('filtroCodInsumo').addEventListener('input', verificarFiltrosECarregar);
 
     preencherObras();
     iniciarAtualizacao();
+
+document.getElementById('btnGerarRelatorio').addEventListener('click', () => {
+  const obra = document.getElementById('filtroObra').value;
+  const cargasSelecionadas = Array.from(document.getElementById('filtroCargas').selectedOptions).map(opt => opt.value);
+  
+  if (obra && cargasSelecionadas.length > 0) {
+    relatorioGerado = true
+    carregarRelatorioPorObraECarga(obra, cargasSelecionadas.join(','));
+  } else {
+    alert("Selecione uma obra e pelo menos uma carga.");
+  }
+});
+
+document.addEventListener('keydown', function(e) {
+
+
+  if (e.key === 'Escape') {
+    document.getElementById('graficoModal').style.display = 'none';
+  }
+});
+
   </script>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>
+
