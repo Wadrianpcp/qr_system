@@ -19,6 +19,15 @@ def index():
 def etiquetas():
     return send_file('etiquetas.html')
 
+@app.route('/grafico_auto')
+def grafico_auto():
+    return send_file('grafico_relatorio_auto.html')
+
+
+@app.route('/grafico')
+def grafico():
+    return send_file('grafico_relatorio.html')
+
 @app.route('/cadastro_funcionario')
 def pagina_cadastro_funcionario():
     return send_file('cadastro_funcionario.html')
