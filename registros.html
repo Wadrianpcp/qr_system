@@ -136,6 +136,8 @@ $(document).ready(function () {
   const tabela = $('#tabelaQR').DataTable({
     processing: true,
     serverSide: true,
+    searching: false,
+
     ajax: {
       url: '/listar_qr',
       type: 'GET',
