@@ -81,29 +81,78 @@ def registrar_qr():
         cur.close()
         conn.close()
 
-
-
 @app.route('/listar_qr', methods=['GET'])
-def listar_qr():
+def listar_qr_server_side():
+    draw = int(request.args.get('draw', 1))
+    start = int(request.args.get('start', 0))
+    length = int(request.args.get('length', 10))
+    filtro_qr = request.args.get('filtroQR')
+    filtro_usuario = request.args.get('filtroUsuario')
+
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, codigo_qr, data_hora, usuario, status FROM registros_qr ORDER BY data_hora DESC")
-    registros = cur.fetchall()
-    cur.close()
-    conn.close()
+
+    filtros = []
+    valores = []
+
+    if filtro_qr:
+        filtros.append("codigo_qr = %s")
+        valores.append(filtro_qr)
+    if filtro_usuario:
+        filtros.append("usuario = %s")
+        valores.append(filtro_usuario)
+
+    where_clause = f"WHERE {' AND '.join(filtros)}" if filtros else ""
+
+    # total filtrado
+    cur.execute(f"SELECT COUNT(*) FROM registros_qr {where_clause}", valores)
+    records_total = cur.fetchone()[0]
+
+    # dados paginados
+    cur.execute(f"""
+        SELECT id, codigo_qr, usuario, data_hora
+        FROM registros_qr
+        {where_clause}
+        ORDER BY data_hora DESC
+        LIMIT %s OFFSET %s
+    """, (*valores, length, start))
+    dados = cur.fetchall()
 
     tz = pytz.timezone('America/Sao_Paulo')
-    registros_formatados = [
+    registros = [
         {
             "id": r[0],
             "codigo_qr": r[1],
-            "data_hora": r[2].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[2] else "",
-            "usuario": r[3],
-            "status": r[4]
+            "usuario": r[2],
+            "data_hora": r[3].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[3] else ""
         }
-        for r in registros
+        for r in dados
     ]
-    return jsonify(registros_formatados)
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "draw": draw,
+        "recordsTotal": records_total,
+        "recordsFiltered": records_total,
+        "data": registros
+    })
+
+
+@app.route('/listar_qr_filtros')
+def listar_qr_filtros():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT codigo_qr, usuario FROM registros_qr")
+    dados = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([
+        {"codigo_qr": r[0], "usuario": r[1]}
+        for r in dados
+        if r[0] and r[1]
+    ])
 
 
 @app.route('/listar_qr_obra', methods=['GET'])
