@@ -86,48 +86,52 @@ def listar_qr_server_side():
     draw = int(request.args.get('draw', 1))
     start = int(request.args.get('start', 0))
     length = int(request.args.get('length', 10))
-    filtro_qr = request.args.get('filtroQR')
-    filtro_usuario = request.args.get('filtroUsuario')
+    filtro_qr = request.args.get('filtroQR', '').strip()
+    filtro_usuario = request.args.get('filtroUsuario', '').strip()
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    filtros = []
+    where_clauses = []
     valores = []
 
     if filtro_qr:
-        filtros.append("codigo_qr = %s")
-        valores.append(filtro_qr)
+        where_clauses.append("codigo_qr ILIKE %s")
+        valores.append(f"%{filtro_qr}%")
+
     if filtro_usuario:
-        filtros.append("usuario = %s")
+        where_clauses.append("usuario = %s")
         valores.append(filtro_usuario)
 
-    where_clause = f"WHERE {' AND '.join(filtros)}" if filtros else ""
+    where_sql = " AND ".join(where_clauses)
+    if where_sql:
+        where_sql = "WHERE " + where_sql
 
-    # total filtrado
-    cur.execute(f"SELECT COUNT(*) FROM registros_qr {where_clause}", valores)
+    # Total de registros (sem filtro)
+    cur.execute("SELECT COUNT(*) FROM registros_qr")
     records_total = cur.fetchone()[0]
 
-    # dados paginados
+    # Total de registros filtrados
+    cur.execute(f"SELECT COUNT(*) FROM registros_qr {where_sql}", tuple(valores))
+    records_filtered = cur.fetchone()[0]
+
+    # Dados da página
     cur.execute(f"""
         SELECT id, codigo_qr, usuario, data_hora
         FROM registros_qr
-        {where_clause}
+        {where_sql}
         ORDER BY data_hora DESC
         LIMIT %s OFFSET %s
     """, (*valores, length, start))
     dados = cur.fetchall()
 
     tz = pytz.timezone('America/Sao_Paulo')
-    registros = [
-        {
-            "id": r[0],
-            "codigo_qr": r[1],
-            "usuario": r[2],
-            "data_hora": r[3].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[3] else ""
-        }
-        for r in dados
-    ]
+    data = [{
+        "id": r[0],
+        "codigo_qr": r[1],
+        "usuario": r[2],
+        "data_hora": r[3].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[3] else ""
+    } for r in dados]
 
     cur.close()
     conn.close()
@@ -135,8 +139,8 @@ def listar_qr_server_side():
     return jsonify({
         "draw": draw,
         "recordsTotal": records_total,
-        "recordsFiltered": records_total,
-        "data": registros
+        "recordsFiltered": records_filtered,
+        "data": data
     })
 
 
