@@ -80,9 +80,8 @@
   <button id="voltar" onclick="window.location.href='/'">Voltar</button>
 
   <div class="top-bar">
-    <select id="filtroQR">
-      <option value="">Filtrar por Código QR</option>
-    </select>
+<input type="text" id="filtroQR" placeholder="Digite o Código QR" />
+
     <select id="filtroUsuario">
       <option value="">Filtrar por Usuário</option>
     </select>
@@ -165,28 +164,27 @@ $(document).ready(function () {
   });
 
   // Recarrega ao trocar os filtros
-  $('#filtroQR, #filtroUsuario').on('change', function () {
-    tabela.ajax.reload();
+$('#filtroUsuario').on('change', function () {
+  tabela.ajax.reload();
+});
+
+$('#filtroQR').on('input', function () {
+  tabela.ajax.reload();
+});
+
+
+  // Carregar opções de filtro de usuário
+fetch('/listar_qr_filtros')
+  .then(res => res.json())
+  .then(data => {
+    const usuarioSelect = $('#filtroUsuario');
+    const usuariosUnicos = [...new Set(data.map(r => r.usuario))].sort();
+
+    usuariosUnicos.forEach(u => {
+      usuarioSelect.append(`<option value="${u}">${u}</option>`);
+    });
   });
 
-  // Carregar opções de filtro QR
-  fetch('/listar_qr_filtros')
-    .then(res => res.json())
-    .then(data => {
-      const qrSelect = $('#filtroQR');
-      const usuarioSelect = $('#filtroUsuario');
-
-      const codigosUnicos = [...new Set(data.map(r => r.codigo_qr))].sort();
-      const usuariosUnicos = [...new Set(data.map(r => r.usuario))].sort();
-
-      codigosUnicos.forEach(c => {
-        qrSelect.append(`<option value="${c}">${c}</option>`);
-      });
-
-      usuariosUnicos.forEach(u => {
-        usuarioSelect.append(`<option value="${u}">${u}</option>`);
-      });
-    });
 });
   </script>
 </body>
