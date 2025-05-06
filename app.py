@@ -4,6 +4,15 @@ import pandas as pd
 from datetime import datetime
 import pytz
 
+from psycopg2.extensions import register_adapter, AsIs
+
+def adapt_list(lst):
+    return AsIs("ARRAY[" + ",".join(["'%s'" % item for item in lst]) + "]")
+
+register_adapter(list, adapt_list)
+
+
+
 app = Flask(__name__)
 
 DATABASE_URL = "postgresql://neondb_owner:npg_lJHgpoh53QXM@ep-old-night-acgy3449-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require"
@@ -59,6 +68,56 @@ def lista_carga():
 @app.route('/relatorio')
 def relatorio():
     return send_file('relatorio.html')
+
+
+@app.route('/dados_grafico', methods=['POST'])
+def dados_grafico():
+    data = request.get_json()
+    obra = data.get('obra')
+    cargas = data.get('cargas', [])
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Atualiza a view antes de consultar
+    cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_mv;")
+
+    query = """
+        SELECT 
+            SUM(total_necessario) AS total_carga,
+            SUM(bipado_fabrica) AS bipado_fabrica,
+            SUM(bipado_obra) AS bipado_obra
+        FROM relatorio_atendimento_carga_mv
+        WHERE 1=1
+    """
+    params = []
+
+    if obra:
+        query += " AND obra = %s"
+        params.append(obra)
+    if cargas:
+        query += " AND cargas = ANY(%s)"
+        params.append(cargas)
+
+    cur.execute(query, tuple(params))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    total_carga = row[0] or 0
+    bipado_fabrica = row[1] or 0
+    bipado_obra = row[2] or 0
+    nao_bipado = total_carga - bipado_fabrica
+
+    return jsonify({
+        'total_carga': total_carga,
+        'bipado_fabrica': bipado_fabrica,
+        'bipado_obra': bipado_obra,
+        'nao_bipado': max(0, nao_bipado)
+    })
+
+
+
 
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
@@ -268,93 +327,56 @@ def registrar_qr_obra():
         cur.close()
         conn.close()
 
-@app.route('/relatorio_diferencas')
-def relatorio_diferencas():
-    obra_filtro = request.args.get("obra")
-    cargas_param = request.args.get("cargas")
-    cargas_lista = cargas_param.split(",") if cargas_param else []
 
-    if not obra_filtro or not cargas_lista:
-        return jsonify([])
-
+@app.route("/atualizar_relatorio_mv")
+def atualizar_relatorio_mv():
     try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # 1. Busca todos os registros da obra para usar na lógica de bipagem (em ordem)
-                cur.execute("""
-                    SELECT cod_insumo, produto, uhs, obra, cargas, total, pav, id
-                    FROM lista_de_carga
-                    WHERE obra = %s
-                    ORDER BY id
-                """, (obra_filtro,))
-                lista_toda = cur.fetchall()
-                colunas = [desc[0] for desc in cur.description]
-                todos_registros = [dict(zip(colunas, linha)) for linha in lista_toda]
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("REFRESH MATERIALIZED VIEW relatorio_atendimento_carga_mv;")  # 🔄 sem CONCURRENTLY
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"mensagem": "View atualizada com sucesso"})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
 
-                # 2. Filtra somente os registros das cargas selecionadas para exibição
-                registros_filtrados = [r for r in todos_registros if r["cargas"] in cargas_lista]
 
-                if not registros_filtrados:
-                    return jsonify([])
 
-                # 3. Pega os cod_insumo únicos da carga filtrada (não da obra toda)
-                cods_insumo = tuple(set(r["cod_insumo"] for r in registros_filtrados))
-                placeholder = ','.join(['%s'] * len(cods_insumo))
+@app.route('/relatorio_diferencas', methods=['POST'])
+def relatorio_diferencas():
+    try:
+        dados = request.get_json()
+        obra = dados.get('obra')
+        cargas = dados.get('cargas', [])
 
-                # 4. Busca os bipados da fábrica e obra para toda a obra
-                cur.execute(f"""
-                    SELECT codigo_qr, COUNT(*) 
-                    FROM registros_qr
-                    WHERE codigo_qr IN ({placeholder}) AND codigo_qr IN (
-                        SELECT cod_insumo FROM lista_de_carga WHERE obra = %s
-                    )
-                    GROUP BY codigo_qr
-                """, (*cods_insumo, obra_filtro))
-                bipado_fabrica_dict = dict(cur.fetchall())
+        conn = get_db_connection()
+        cur = conn.cursor()
 
-                cur.execute(f"""
-                    SELECT codigo_qr, COUNT(*) 
-                    FROM recebimento_obra
-                    WHERE codigo_qr IN ({placeholder}) AND codigo_qr IN (
-                        SELECT cod_insumo FROM lista_de_carga WHERE obra = %s
-                    )
-                    GROUP BY codigo_qr
-                """, (*cods_insumo, obra_filtro))
-                bipado_obra_dict = dict(cur.fetchall())
+        query = "SELECT * FROM relatorio_atendimento_carga_mv WHERE 1=1"
+        parametros = []
 
-                # 5. Abate os bipados na ordem dos registros da obra (não só das cargas filtradas)
-                disponivel_fabrica = bipado_fabrica_dict.copy()
-                disponivel_obra = bipado_obra_dict.copy()
-                bipagem_aplicada = []
+        if obra:
+            query += " AND obra = %s"
+            parametros.append(obra)
 
-                for registro in todos_registros:
-                    cod_insumo = registro["cod_insumo"]
-                    total = int(registro["total"])
+        if cargas:
+            query += " AND cargas = ANY(%s)"
+            parametros.append(cargas)
 
-                    usado_fabrica = min(disponivel_fabrica.get(cod_insumo, 0), total)
-                    disponivel_fabrica[cod_insumo] = disponivel_fabrica.get(cod_insumo, 0) - usado_fabrica
+        cur.execute(query, tuple(parametros))
+        resultado = cur.fetchall()
 
-                    usado_obra = min(disponivel_obra.get(cod_insumo, 0), total)
-                    disponivel_obra[cod_insumo] = disponivel_obra.get(cod_insumo, 0) - usado_obra
+        colunas = [desc[0] for desc in cur.description]
+        dados_json = [dict(zip(colunas, linha)) for linha in resultado]
 
-                    registro_resultado = {
-                        "cod_insumo": cod_insumo,
-                        "produto": registro["produto"],
-                        "obra": registro["obra"],
-                        "cargas": registro["cargas"],
-                        "total_necessario": total,
-                        "bipado_fabrica": usado_fabrica,
-                        "bipado_obra": usado_obra
-                    }
-
-                    bipagem_aplicada.append(registro_resultado)
-
-                # 6. Filtra novamente só os registros das cargas selecionadas para exibir
-                relatorio = [r for r in bipagem_aplicada if r["cargas"] in cargas_lista]
-                return jsonify(relatorio)
+        cur.close()
+        conn.close()
+        return jsonify(dados_json)
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
+
 
 
 @app.route('/excluir_qr_obra/<int:id>', methods=['DELETE'])
@@ -428,6 +450,22 @@ def verificar_senha():
         return jsonify({"valido": True})
     else:
         return jsonify({"valido": False}), 401
+
+@app.route('/atualizar_view', methods=['POST'])
+def atualizar_view():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_mv;')
+        conn.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
 
 @app.route('/listar_funcionarios', methods=['GET'])
 def listar_funcionarios():
