@@ -10,6 +10,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
  <style>
 
+.status-verde {
+  background-color: #d4edda !important;
+}
+.status-amarelo {
+  background-color: #fff3cd !important;
+}
+.status-vermelho {
+  background-color: #f8d7da !important;
+}
+
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -128,7 +139,20 @@
       align-items: center;
     }
   }
+
 </style>
+
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/scroller/2.2.0/css/scroller.dataTables.min.css">
+
+<!-- jQuery (necessário para DataTables) -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/scroller/2.2.0/js/dataTables.scroller.min.js"></script>
+
 </head>
 <body>
 <div id="loading" style="display:none; margin-top: 20px;">
@@ -183,9 +207,7 @@
 
 
   <div id="autoUpdateControls">
-    <button id="toggleAtualizacao">Desligar Atualização Automática</button>
-    <label>Intervalo (seg): <input type="number" id="intervaloTempo" value="5" min="1" style="width: 60px;"></label>
-
+   
 
 <div id="graficoModal" style="
   display: none;
@@ -230,19 +252,24 @@
 </div>
 
 <div id="mensagemInicial">Clique em <strong>Gerar Relatório</strong> após selecionar uma obra e carga.</div>
-  <table>
 
+<table id="relatorioTable" class="display nowrap" style="width:100%">
+  <thead>
+    <tr>
+      <th>COD INSUMO</th>
+      <th>PRODUTO</th>
+      <th>OBRA</th>
+      <th>CARGAS</th>
+      <th>TOTAL NECESSÁRIO</th>
+      <th>BIPADO FABRICA</th>
+      <th>BIPADO OBRA</th>
+    </tr>
+  </thead>
+  <tbody id="tabelaRelatorio">
+    <tr><td colspan="7">Selecione uma obra para visualizar os dados.</td></tr>
+  </tbody>
+</table>
 
-    <thead>
-      <tr>
-        <th>COD INSUMO</th><th>PRODUTO</th><th>OBRA</th><th>CARGAS</th>
-        <th>TOTAL NECESSÁRIO</th><th>BIPADO FABRICA</th><th>BIPADO OBRA</th>
-      </tr>
-    </thead>
-    <tbody id="tabelaRelatorio">
-      <tr><td colspan="7">Selecione uma obra para visualizar os dados.</td></tr>
-    </tbody>
-  </table>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
@@ -282,7 +309,12 @@ function atualizarGraficoPizza() {
   titulo.textContent = `Resumo Gráfico: ${obra} | Carga(s): ${cargasSelecionadas.join(', ')}`;
   if (!obra || cargasSelecionadas.length === 0) return;
 
-  fetch(`/relatorio_diferencas?obra=${encodeURIComponent(obra)}&cargas=${encodeURIComponent(cargasSelecionadas.join(","))}`)
+fetch('/relatorio_diferencas', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ obra: obra, cargas: cargasSelecionadas })
+})
+
     .then(res => res.json())
     .then(data => {
       let total = 0;
@@ -312,11 +344,6 @@ document.getElementById('resumoGraficos').textContent =
       if (chartFabrica) {
         chartFabrica.data.datasets[0].data = dadosFabrica;
         chartFabrica.update();
-let lastFabrica = [], lastObra = [];
-
-function arraysIguais(a, b) {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
-}
 
       } else {
         chartFabrica = new Chart(document.getElementById('graficoFabrica').getContext('2d'), {
@@ -359,11 +386,6 @@ formatter: (value, context) => {
       if (chartObra) {
         chartObra.data.datasets[0].data = dadosObra;
         chartObra.update();
-let lastFabrica = [], lastObra = [];
-
-function arraysIguais(a, b) {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
-}
 
       } else {
         chartObra = new Chart(document.getElementById('graficoObra').getContext('2d'), {
@@ -404,37 +426,33 @@ formatter: (value, context) => {
     });
 }
 
-  // Atualização automática do gráfico enquanto estiver aberto
-  setInterval(() => {
-    if (document.getElementById('graficoModal').style.display === 'block') {
-      atualizarGraficoPizza();
-chartFabrica.options.animation = false;
-chartObra.options.animation = false;
+ // Atualiza a view e depois o gráfico enquanto o modal estiver aberto
+setInterval(() => {
+  if (document.getElementById('graficoModal').style.display === 'block') {
+    fetch('/atualizar_relatorio_mv')
+      .then(res => res.json())
+      .then(data => {
+        console.log("View atualizada:", data.mensagem || data.erro || "OK");
+        atualizarGraficoPizza();  // só chama o gráfico após atualizar a view
+      })
+      .catch(err => {
+        console.error("Erro ao atualizar view:", err.message);
+      });
+  }
+}, 10000);  // a cada 10 segundos
 
-    }
-  }, 10000);
 
     let intervaloAtualizacao = 5000;
     let atualizar = true;
-    let intervaloId;
+    
 
     document.getElementById("voltarBtn").addEventListener("click", () => {
       const origem = new URLSearchParams(window.location.search).get("origem");
       window.location.href = origem === "obra" ? "/obra" : "/";
     });
 
-    document.getElementById("toggleAtualizacao").addEventListener("click", () => {
-      atualizar = !atualizar;
-      document.getElementById("toggleAtualizacao").textContent =
-        atualizar ? "Desligar Atualização Automática" : "Ligar Atualização Automática";
-    });
+ 
 
-    document.getElementById("intervaloTempo").addEventListener("change", () => {
-      const valor = parseInt(document.getElementById("intervaloTempo").value) || 5;
-      intervaloAtualizacao = valor * 1000;
-      clearInterval(intervaloId);
-      iniciarAtualizacao();
-    });
 
     function iniciarAtualizacao() {
       intervaloId = setInterval(() => {
@@ -482,9 +500,16 @@ const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => op
 function carregarRelatorioPorObraECarga(obra, cargas) {
   document.getElementById('loading').style.display = 'block';
 
-  fetch(`/relatorio_diferencas?obra=${encodeURIComponent(obra)}&cargas=${encodeURIComponent(cargas)}`)
+  fetch('/relatorio_diferencas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ obra: obra, cargas: cargas })  // Aqui, cargas já é um array
+  })
+
+
     .then(res => res.json())
-    .then(data => {
+.then(data => {
+  console.log("DEBUG Dados do servidor:", data);
   renderizarTabela(data);
   // Aguarda o navegador renderizar a tabela antes de ocultar o loading
   requestAnimationFrame(() => {
@@ -501,68 +526,85 @@ function carregarRelatorioPorObraECarga(obra, cargas) {
 }
 
 
-    function renderizarTabela(data) {
-document.getElementById('mensagemInicial').style.display = 'none';
+function renderizarTabela(data) {
+  document.getElementById('mensagemInicial').style.display = 'none';
 
-  console.log("Dados recebidos:", data); // debug opcional
+  // 🔁 Destroi a DataTable anterior, se existir
+  if ($.fn.dataTable.isDataTable('#relatorioTable')) {
+    $('#relatorioTable').DataTable().clear().destroy();
+  }
 
-  // Verifica se os dados recebidos são realmente uma lista (array)
-  if (!Array.isArray(data)) {
-    document.getElementById('tabelaRelatorio').innerHTML = `<tr><td colspan="7">Erro: dados inválidos do servidor</td></tr>`;
+  const tabela = document.getElementById('tabelaRelatorio');
+  tabela.innerHTML = '';
+
+  if (!Array.isArray(data) || data.length === 0) {
+    tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
     return;
   }
-      const filtroCodInsumo = document.getElementById('filtroCodInsumo').value.toLowerCase();
-      const filtroCargasSelecionadas = Array.from(document.getElementById('filtroCargas').selectedOptions).map(opt => opt.value);
-      const filtroStatus = document.getElementById('filtroStatus').value;
-      const tabela = document.getElementById('tabelaRelatorio');
-      tabela.innerHTML = '';
 
-      let totalCarga = 0, totalBipadoFabrica = 0, totalBipadoObra = 0;
+  const filtroCodInsumo = document.getElementById('filtroCodInsumo').value.toLowerCase();
+  const filtroCargasSelecionadas = Array.from(document.getElementById('filtroCargas').selectedOptions).map(opt => opt.value);
+  const filtroStatus = document.getElementById('filtroStatus').value;
 
-      const filtrado = data.filter(item => {
-        let status = item.bipado_fabrica > 0 && item.bipado_obra > 0 ? 'verde' :
-                     item.bipado_fabrica > 0 ? 'amarelo' : 'vermelho';
-        return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo)) &&
-               (!filtroCargasSelecionadas.length || filtroCargasSelecionadas.includes(item.cargas)) &&
-               (!filtroStatus || status === filtroStatus);
-      });
+  let totalCarga = 0, totalBipadoFabrica = 0, totalBipadoObra = 0;
 
-      if (filtrado.length === 0) {
-        tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
-        return;
-      }
+  const filtrado = data.filter(item => {
+    let status = item.bipado_fabrica > 0 && item.bipado_obra > 0 ? 'verde' :
+                 item.bipado_fabrica > 0 ? 'amarelo' : 'vermelho';
+    return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo)) &&
+           (!filtroCargasSelecionadas.length || filtroCargasSelecionadas.includes(item.cargas)) &&
+           (!filtroStatus || status === filtroStatus);
+  });
 
-      filtrado.forEach(item => {
-        let classe = item.bipado_fabrica > 0 && item.bipado_obra > 0 ? 'status-verde' :
-                     item.bipado_fabrica > 0 ? 'status-amarelo' : 'status-vermelho';
+  if (filtrado.length === 0) {
+    tabela.innerHTML = '<tr><td colspan="7">Nenhum dado encontrado.</td></tr>';
+    return;
+  }
 
-        totalCarga += parseInt(item.total_necessario);
-        totalBipadoFabrica += parseInt(item.bipado_fabrica);
-        totalBipadoObra += parseInt(item.bipado_obra);
+  filtrado.forEach(item => {
+    let classe = item.bipado_fabrica > 0 && item.bipado_obra > 0 ? 'status-verde' :
+                 item.bipado_fabrica > 0 ? 'status-amarelo' : 'status-vermelho';
 
-        tabela.innerHTML += `
-          <tr class="${classe}">
-            <td>${item.cod_insumo}</td>
-            <td>${item.produto}</td>
-            <td>${item.obra}</td>
-            <td>${item.cargas}</td>
-            <td>${item.total_necessario}</td>
-            <td>${item.bipado_fabrica}</td>
-            <td>${item.bipado_obra}</td>
-          </tr>`;
-      });
+    totalCarga += parseInt(item.total_necessario);
+    totalBipadoFabrica += parseInt(item.bipado_fabrica);
+    totalBipadoObra += parseInt(item.bipado_obra);
 
-      document.getElementById('totalCarga').textContent = totalCarga;
-      document.getElementById('totalBipadoFabrica').textContent = totalBipadoFabrica;
-      document.getElementById('totalBipadoObra').textContent = totalBipadoObra;
+    const linha = tabela.insertRow();
+    linha.className = classe;
 
-      const evolucao = totalCarga > 0 ? ((totalBipadoFabrica / totalCarga) * 100).toFixed(0) + "%" : "0%";
-      document.getElementById('evolucaoCarga').textContent = evolucao;
-      document.getElementById('filtroStatus').disabled = false;
-      document.getElementById('filtroCodInsumo').disabled = false;
+    ["cod_insumo", "produto", "obra", "cargas", "total_necessario", "bipado_fabrica", "bipado_obra"].forEach(campo => {
+      const celula = linha.insertCell();
+      celula.textContent = item[campo];
+    });
+  });
 
+  document.getElementById('totalCarga').textContent = totalCarga;
+  document.getElementById('totalBipadoFabrica').textContent = totalBipadoFabrica;
+  document.getElementById('totalBipadoObra').textContent = totalBipadoObra;
 
+  const evolucao = totalCarga > 0 ? ((totalBipadoFabrica / totalCarga) * 100).toFixed(0) + "%" : "0%";
+  document.getElementById('evolucaoCarga').textContent = evolucao;
+
+  // ⚙️ Recria o DataTables com scroller
+$('#relatorioTable').DataTable({
+  scrollY: 400,
+  scrollCollapse: true,
+  scroller: true,
+  paging: true, // ✅ Necessário para funcionar com scroller
+  info: false,
+  searching: false,
+  deferRender: true,
+  language: {
+    paginate: {
+      next: '',
+      previous: ''
     }
+  },
+  dom: 'rt' // ✅ Remove os controles visuais (filtro, paginação, etc.)
+});
+
+}
+
 
     function verificarFiltrosECarregar() {
       const obra = document.getElementById('filtroObra').value;
@@ -580,45 +622,65 @@ document.getElementById('mensagemInicial').style.display = 'none';
       }
     }
 document.getElementById('filtroObra').addEventListener('change', e => {
-      const obra = e.target.value;
-      document.getElementById('filtroCargas').value = "";
-      document.getElementById('filtroStatus').value = "";
-      document.getElementById('filtroCodInsumo').value = "";
-      document.getElementById('filtroStatus').disabled = true;
-      document.getElementById('filtroCodInsumo').disabled = true;
+  const obra = e.target.value;
+  document.getElementById('filtroCargas').value = "";
+  document.getElementById('filtroStatus').value = "";
+  document.getElementById('filtroCodInsumo').value = "";
+  document.getElementById('filtroStatus').disabled = true;
+  document.getElementById('filtroCodInsumo').disabled = true;
 
-      if (obra) {
-        fetch(`/cargas_disponiveis?obra=${encodeURIComponent(obra)}`)
-          .then(res => res.json())
-          .then(cargas => {
-            const cargasSelect = document.getElementById('filtroCargas');
-            cargasSelect.innerHTML = '<option value="">Selecione uma Carga</option>';
-            cargas.forEach(c => {
-              const opt = document.createElement('option');
-              opt.value = c;
-              opt.textContent = c;
-              cargasSelect.appendChild(opt);
-            });
-          });
-      }
+  if (obra) {
+    fetch(`/cargas_disponiveis?obra=${encodeURIComponent(obra)}`)
+      .then(res => res.json())
+      .then(cargas => {
+        const cargasSelect = document.getElementById('filtroCargas');
+        cargasSelect.innerHTML = '<option value="">Selecione uma Carga</option>';
+        cargas.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          cargasSelect.appendChild(opt);
+        });
 
-    });
+        // ✅ Ativa os filtros após carregar as cargas
+        document.getElementById('filtroStatus').disabled = false;
+        document.getElementById('filtroCodInsumo').disabled = false;
+      });
+  }
+});
 
 
-    preencherObras();
-    iniciarAtualizacao();
+ document.addEventListener('DOMContentLoaded', () => {
+  preencherObras();
+});
+
+
 
 document.getElementById('btnGerarRelatorio').addEventListener('click', () => {
   const obra = document.getElementById('filtroObra').value;
   const cargasSelecionadas = Array.from(document.getElementById('filtroCargas').selectedOptions).map(opt => opt.value);
-  
+
   if (obra && cargasSelecionadas.length > 0) {
-    relatorioGerado = true
-    carregarRelatorioPorObraECarga(obra, cargasSelecionadas.join(','));
+    document.getElementById('loading').style.display = 'block';
+
+    fetch('/atualizar_relatorio_mv')
+      .then(res => res.json())
+      .then(data => {
+        if (data.mensagem || data.erro) {
+
+        }
+        relatorioGerado = true;
+        carregarRelatorioPorObraECarga(obra, cargasSelecionadas);
+      })
+      .catch(err => {
+        alert("Erro ao atualizar view: " + err.message);
+        document.getElementById('loading').style.display = 'none';
+      });
   } else {
     alert("Selecione uma obra e pelo menos uma carga.");
   }
 });
+
 
 document.addEventListener('keydown', function(e) {
 
@@ -627,6 +689,58 @@ document.addEventListener('keydown', function(e) {
     document.getElementById('graficoModal').style.display = 'none';
   }
 });
+
+function atualizarView() {
+  document.getElementById('loading').style.display = 'block';
+
+  fetch('/atualizar_relatorio_mv')
+    .then(res => res.json())
+.then(data => {
+  document.getElementById('loading').style.display = 'none';
+})
+
+    .catch(err => {
+      alert("Erro ao atualizar view: " + err.message);
+      document.getElementById('loading').style.display = 'none';
+    });
+}
+
+document.getElementById('btnAtualizarView').addEventListener('click', atualizarView);
+
+
+function atualizarGraficos() {
+  const graficoAberto = document.getElementById('graficoModal').style.display === 'block';
+  if (!graficoAberto) return;
+
+  fetch('/dados_grafico', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ obra, cargas: cargasSelecionadas })
+})
+
+    .then(response => response.json())
+    .then(data => {
+      if (chartFabrica && chartObra) {
+        chartFabrica.data.datasets[0].data = [
+          data.bipado_fabrica, 
+          data.total_carga - data.bipado_fabrica
+        ];
+        chartFabrica.update();
+
+        chartObra.data.datasets[0].data = [
+          data.bipado_obra, 
+          data.total_carga - data.bipado_obra
+        ];
+        chartObra.update();
+      }
+    });
+}
+
+
+// Atualiza a cada 5 segundos
+setInterval(atualizarGraficos, 5000);
+
+
 
   </script>
 
