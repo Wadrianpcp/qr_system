@@ -3,12 +3,6 @@
 <head>
 <link rel="manifest" href="/static/manifest.json">
 <meta name="theme-color" content="#1976d2">
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/static/service-worker.js');
-  }
-</script>
-
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Registro de QR Code</title>
@@ -325,6 +319,10 @@ function confirmarSenhaCadastro() {
     fecharModalSenha();
   }
 }
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/service-worker.js');
+  }
 
   </script>
 
