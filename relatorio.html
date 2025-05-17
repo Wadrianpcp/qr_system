@@ -174,6 +174,10 @@
     <label for="filtroCodInsumo">COD INSUMO:</label>
     <input type="text" id="filtroCodInsumo" placeholder="Digite o código...">
 
+    <label for="filtroProduto">PRODUTO:</label>
+    <input type="text" id="filtroProduto" placeholder="Digite o produto...">
+
+
     <label>Cargas: 
       <select id="filtroCargas" multiple size="5" style="min-width: 200px;"></select>
     </label>
@@ -543,6 +547,9 @@ function renderizarTabela(data) {
   }
 
   const filtroCodInsumo = document.getElementById('filtroCodInsumo').value.toLowerCase();
+
+const filtroProduto = document.getElementById('filtroProduto').value.toLowerCase();
+
   const filtroCargasSelecionadas = Array.from(document.getElementById('filtroCargas').selectedOptions).map(opt => opt.value);
   const filtroStatus = document.getElementById('filtroStatus').value;
 
@@ -551,9 +558,11 @@ function renderizarTabela(data) {
   const filtrado = data.filter(item => {
     let status = item.bipado_fabrica > 0 && item.bipado_obra > 0 ? 'verde' :
                  item.bipado_fabrica > 0 ? 'amarelo' : 'vermelho';
-    return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo)) &&
-           (!filtroCargasSelecionadas.length || filtroCargasSelecionadas.includes(item.cargas)) &&
-           (!filtroStatus || status === filtroStatus);
+return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo)) &&
+       (!filtroProduto || item.produto.toLowerCase().includes(filtroProduto)) &&
+       (!filtroCargasSelecionadas.length || filtroCargasSelecionadas.includes(item.cargas)) &&
+       (!filtroStatus || status === filtroStatus);
+
   });
 
   if (filtrado.length === 0) {
@@ -748,4 +757,3 @@ setInterval(atualizarGraficos, 5000);
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>
-
