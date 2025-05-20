@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <title>Registros de QR Codes (Obra)</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
   <style>
     body {
       font-family: 'Roboto', sans-serif;
@@ -78,9 +81,8 @@
 <button id="voltar" onclick="window.location.href='/obra'">Voltar</button>
 
   <div class="top-bar">
-    <select id="filtroQR">
-      <option value="">Filtrar por Código QR</option>
-    </select>
+<input type="text" id="filtroQR" placeholder="Digite o Código QR" />
+
     <select id="filtroUsuario">
       <option value="">Filtrar por Usuário</option>
     </select>
@@ -88,87 +90,26 @@
 
   <div id="mensagem" class="mensagem"></div>
 
-  <table>
+
+
+  <table id="tabelaRegistros">
     <thead>
       <tr>
         <th>ID</th>
         <th>Código QR</th>
-        <th>Data/Hora</th>
         <th>Usuário</th>
+        <th>Data e Hora</th>
         <th>Ação</th>
       </tr>
     </thead>
-    <tbody id="tabelaRegistros">
-      <tr><td colspan="5">Carregando...</td></tr>
-    </tbody>
+    <tbody></tbody>
   </table>
 
   <script>
-    let registros = [];
-
-    function carregarRegistros() {
-      fetch('/listar_qr_obra')
-        .then(res => res.json())
-        .then(data => {
-          registros = data;
-          popularFiltros(data);
-          renderizarTabela();
-        })
-        .catch(() => {
-          document.getElementById('tabelaRegistros').innerHTML = "<tr><td colspan='5'>Erro ao carregar dados.</td></tr>";
-        });
-    }
-
-    function popularFiltros(data) {
-      const usuarios = [...new Set(data.map(r => r.usuario))];
-      const codigos = [...new Set(data.map(r => r.codigo_qr))];
-
-      const selUsuario = document.getElementById('filtroUsuario');
-      const selQR = document.getElementById('filtroQR');
-
-      usuarios.forEach(user => {
-        const opt = document.createElement('option');
-        opt.value = user;
-        opt.textContent = user;
-        selUsuario.appendChild(opt);
-      });
-
-      codigos.forEach(cod => {
-        const opt = document.createElement('option');
-        opt.value = cod;
-        opt.textContent = cod;
-        selQR.appendChild(opt);
-      });
-    }
-
-    function renderizarTabela() {
-      const filtroUsuario = document.getElementById('filtroUsuario').value;
-      const filtroQR = document.getElementById('filtroQR').value;
-      const tabela = document.getElementById('tabelaRegistros');
-      tabela.innerHTML = "";
-
-      const filtrado = registros.filter(r =>
-        (!filtroUsuario || r.usuario === filtroUsuario) &&
-        (!filtroQR || r.codigo_qr === filtroQR)
-      );
-
-      if (filtrado.length === 0) {
-        tabela.innerHTML = "<tr><td colspan='5'>Nenhum registro encontrado.</td></tr>";
-        return;
-      }
-
-      filtrado.forEach(r => {
-        const linha = `
-          <tr>
-            <td>${r.id}</td>
-            <td>${r.codigo_qr}</td>
-            <td>${r.data_hora || ""}</td>
-            <td>${r.usuario}</td>
-            <td><button onclick="excluirRegistro(${r.id})">Excluir</button></td>
-          </tr>
-        `;
-        tabela.innerHTML += linha;
-      });
+    function mostrarMensagem(msg, sucesso) {
+      const el = document.getElementById("mensagem");
+      el.textContent = msg;
+      el.className = "mensagem " + (sucesso ? "sucesso" : "erro");
     }
 
     function excluirRegistro(id) {
@@ -183,7 +124,7 @@
         .then(res => {
           if (res.sucesso) {
             mostrarMensagem("Registro excluído com sucesso!", true);
-            carregarRegistros();
+            $('#tabelaRegistros').DataTable().ajax.reload();
             new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg').play();
           } else {
             mostrarMensagem("Erro ao excluir o registro.", false);
@@ -194,16 +135,62 @@
         });
     }
 
-    function mostrarMensagem(msg, sucesso) {
-      const el = document.getElementById("mensagem");
-      el.textContent = msg;
-      el.className = "mensagem " + (sucesso ? "sucesso" : "erro");
-    }
+$(document).ready(function () {
+  const tabela = $('#tabelaRegistros').DataTable({
+    processing: true,
+    serverSide: true,
+    searching: false,
 
-    document.getElementById('filtroUsuario').addEventListener('change', renderizarTabela);
-    document.getElementById('filtroQR').addEventListener('change', renderizarTabela);
+    ajax: {
+      url: '/listar_qr_obra',
+      type: 'GET',
+      data: function (d) {
+        d.filtroQR = $('#filtroQR').val();
+        d.filtroUsuario = $('#filtroUsuario').val();
+      }
+    },
+    columns: [
+      { data: 'id' },
+      { data: 'codigo_qr' },
+      { data: 'usuario' },
+      { data: 'data_hora' },
+      {
+        data: 'id',
+        render: function (data) {
+          return `<button onclick="excluirRegistro(${data})">Excluir</button>`;
+        }
+      }
+    ],
+    language: {
+      url: "//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json"
+    },
+    pageLength: 10,
+    lengthMenu: [10, 25, 50, 100]
+  });
 
-    window.onload = carregarRegistros;
+  // Recarrega ao trocar os filtros
+$('#filtroUsuario').on('change', function () {
+  tabela.ajax.reload();
+});
+
+$('#filtroQR').on('input', function () {
+  tabela.ajax.reload();
+});
+
+
+  // Carregar opções de filtro de usuário
+fetch('/listar_qr_filtros')
+  .then(res => res.json())
+  .then(data => {
+    const usuarioSelect = $('#filtroUsuario');
+    const usuariosUnicos = [...new Set(data.map(r => r.usuario))].sort();
+
+    usuariosUnicos.forEach(u => {
+      usuarioSelect.append(`<option value="${u}">${u}</option>`);
+    });
+  });
+
+});
   </script>
 </body>
 </html>
