@@ -219,29 +219,68 @@ def listar_qr_filtros():
 
 
 @app.route('/listar_qr_obra', methods=['GET'])
-def listar_qr_obra():
+def listar_qr_obra_server_side():
+    draw = int(request.args.get('draw', 1))
+    start = int(request.args.get('start', 0))
+    length = int(request.args.get('length', 10))
+    filtro_qr = request.args.get('filtroQR', '').strip()
+    filtro_usuario = request.args.get('filtroUsuario', '').strip()
+
     conn = get_db_connection()
     cur = conn.cursor()
-    try:
-        cur.execute("SELECT id, codigo_qr, data_hora, usuario, status FROM recebimento_obra ORDER BY data_hora DESC")
-        registros = cur.fetchall()
-        cur.close()
-        conn.close()
 
-        tz = pytz.timezone('America/Sao_Paulo')  # fuso de Brasília
-        registros_formatados = [
-            {
-                "id": r[0],
-                "codigo_qr": r[1],
-                "data_hora": r[2].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[2] else "",
-                "usuario": r[3],
-                "status": r[4]
-            }
-            for r in registros
-        ]
-        return jsonify(registros_formatados)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
+    where_clauses = []
+    valores = []
+
+    if filtro_qr:
+        where_clauses.append("codigo_qr ILIKE %s")
+        valores.append(f"%{filtro_qr}%")
+
+    if filtro_usuario:
+        where_clauses.append("usuario = %s")
+        valores.append(filtro_usuario)
+
+    where_sql = " AND ".join(where_clauses)
+    if where_sql:
+        where_sql = "WHERE " + where_sql
+
+    # Total de registros (sem filtro)
+    cur.execute("SELECT COUNT(*) FROM recebimento_obra")
+    records_total = cur.fetchone()[0]
+
+    # Total de registros filtrados
+    cur.execute(f"SELECT COUNT(*) FROM recebimento_obra {where_sql}", tuple(valores))
+    records_filtered = cur.fetchone()[0]
+
+    # Dados da página
+    cur.execute(f"""
+        SELECT id, codigo_qr, usuario, data_hora
+        FROM recebimento_obra
+        {where_sql}
+        ORDER BY data_hora DESC
+        LIMIT %s OFFSET %s
+    """, (*valores, length, start))
+    dados = cur.fetchall()
+
+    tz = pytz.timezone('America/Sao_Paulo')
+    data = [{
+        "id": r[0],
+        "codigo_qr": r[1],
+        "usuario": r[2],
+        "data_hora": r[3].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[3] else ""
+    } for r in dados]
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "draw": draw,
+        "recordsTotal": records_total,
+        "recordsFiltered": records_filtered,
+        "data": data
+    })
+
+
 
 
 @app.route('/excluir_qr/<int:id>', methods=['DELETE'])
