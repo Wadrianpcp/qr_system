@@ -263,7 +263,7 @@ def obras_lotes():
     finally:
         cur.close()
         conn.close()
-
+        
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
     data = request.json
