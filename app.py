@@ -266,7 +266,6 @@ def obras_lotes():
 
 
 
-
 @app.route('/dados_grafico', methods=['POST'])
 def dados_grafico():
     data = request.get_json()
@@ -277,14 +276,14 @@ def dados_grafico():
     cur = conn.cursor()
 
     # Atualiza a view antes de consultar
-    cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_mv;")
+    cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_embarque_mv;")
 
     query = """
         SELECT 
             SUM(total_necessario) AS total_carga,
             SUM(bipado_fabrica) AS bipado_fabrica,
             SUM(bipado_obra) AS bipado_obra
-        FROM relatorio_atendimento_carga_mv
+        FROM relatorio_atendimento_carga_embarque_mv
         WHERE 1=1
     """
     params = []
@@ -313,6 +312,29 @@ def dados_grafico():
         'nao_bipado': max(0, nao_bipado)
     })
 
+
+
+
+@app.route('/registrar_qr_embarque', methods=['POST'])
+def registrar_qr_embarque():
+    data = request.json
+    codigo_qr = data.get('codigo_qr')
+    usuario = data.get('usuario')
+
+    if not codigo_qr or not usuario:
+        return jsonify({"erro": "Código QR e usuário são obrigatórios"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO registros_qr_embarque (codigo_qr, usuario) VALUES (%s, %s)", (codigo_qr, usuario))
+        conn.commit()
+        return jsonify({"mensagem": "QR Code registrado com sucesso no embarque!"}), 201
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 
 
@@ -415,30 +437,134 @@ def listar_qr_filtros():
     ])
 
 
-@app.route('/listar_qr_obra', methods=['GET'])
-def listar_qr_obra():
+@app.route('/listar_qr_embarque', methods=['GET'])
+def listar_qr_embarque_server_side():
+    draw = int(request.args.get('draw', 1))
+    start = int(request.args.get('start', 0))
+    length = int(request.args.get('length', 10))
+    filtro_qr = request.args.get('filtroQR', '').strip()
+    filtro_usuario = request.args.get('filtroUsuario', '').strip()
+
     conn = get_db_connection()
     cur = conn.cursor()
-    try:
-        cur.execute("SELECT id, codigo_qr, data_hora, usuario, status FROM recebimento_obra ORDER BY data_hora DESC")
-        registros = cur.fetchall()
-        cur.close()
-        conn.close()
 
-        tz = pytz.timezone('America/Sao_Paulo')  # fuso de Brasília
-        registros_formatados = [
-            {
-                "id": r[0],
-                "codigo_qr": r[1],
-                "data_hora": r[2].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[2] else "",
-                "usuario": r[3],
-                "status": r[4]
-            }
-            for r in registros
-        ]
-        return jsonify(registros_formatados)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
+    where_clauses = []
+    valores = []
+
+    if filtro_qr:
+        where_clauses.append("codigo_qr ILIKE %s")
+        valores.append(f"%{filtro_qr}%")
+
+    if filtro_usuario:
+        where_clauses.append("usuario = %s")
+        valores.append(filtro_usuario)
+
+    where_sql = " AND ".join(where_clauses)
+    if where_sql:
+        where_sql = "WHERE " + where_sql
+
+    # Total de registros (sem filtro)
+    cur.execute("SELECT COUNT(*) FROM registros_qr_embarque")
+    records_total = cur.fetchone()[0]
+
+    # Total de registros filtrados
+    cur.execute(f"SELECT COUNT(*) FROM registros_qr_embarque {where_sql}", tuple(valores))
+    records_filtered = cur.fetchone()[0]
+
+    # Dados da página
+    cur.execute(f"""
+        SELECT id, codigo_qr, usuario, data_hora
+        FROM registros_qr_embarque
+        {where_sql}
+        ORDER BY data_hora DESC
+        LIMIT %s OFFSET %s
+    """, (*valores, length, start))
+    dados = cur.fetchall()
+
+    tz = pytz.timezone('America/Sao_Paulo')
+    data = [{
+        "id": r[0],
+        "codigo_qr": r[1],
+        "usuario": r[2],
+        "data_hora": r[3].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[3] else ""
+    } for r in dados]
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "draw": draw,
+        "recordsTotal": records_total,
+        "recordsFiltered": records_filtered,
+        "data": data
+    })
+
+
+
+
+@app.route('/listar_qr_obra', methods=['GET'])
+def listar_qr_obra_server_side():
+    draw = int(request.args.get('draw', 1))
+    start = int(request.args.get('start', 0))
+    length = int(request.args.get('length', 10))
+    filtro_qr = request.args.get('filtroQR', '').strip()
+    filtro_usuario = request.args.get('filtroUsuario', '').strip()
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    where_clauses = []
+    valores = []
+
+    if filtro_qr:
+        where_clauses.append("codigo_qr ILIKE %s")
+        valores.append(f"%{filtro_qr}%")
+
+    if filtro_usuario:
+        where_clauses.append("usuario = %s")
+        valores.append(filtro_usuario)
+
+    where_sql = " AND ".join(where_clauses)
+    if where_sql:
+        where_sql = "WHERE " + where_sql
+
+    # Total de registros (sem filtro)
+    cur.execute("SELECT COUNT(*) FROM recebimento_obra")
+    records_total = cur.fetchone()[0]
+
+    # Total de registros filtrados
+    cur.execute(f"SELECT COUNT(*) FROM recebimento_obra {where_sql}", tuple(valores))
+    records_filtered = cur.fetchone()[0]
+
+    # Dados da página
+    cur.execute(f"""
+        SELECT id, codigo_qr, usuario, data_hora
+        FROM recebimento_obra
+        {where_sql}
+        ORDER BY data_hora DESC
+        LIMIT %s OFFSET %s
+    """, (*valores, length, start))
+    dados = cur.fetchall()
+
+    tz = pytz.timezone('America/Sao_Paulo')
+    data = [{
+        "id": r[0],
+        "codigo_qr": r[1],
+        "usuario": r[2],
+        "data_hora": r[3].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[3] else ""
+    } for r in dados]
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "draw": draw,
+        "recordsTotal": records_total,
+        "recordsFiltered": records_filtered,
+        "data": data
+    })
+
+
 
 
 @app.route('/excluir_qr/<int:id>', methods=['DELETE'])
@@ -530,7 +656,7 @@ def atualizar_relatorio_mv():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("REFRESH MATERIALIZED VIEW relatorio_atendimento_carga_mv;")  # 🔄 sem CONCURRENTLY
+        cur.execute("REFRESH MATERIALIZED VIEW relatorio_atendimento_carga_embarque_mv;")  # 🔄 sem CONCURRENTLY
         conn.commit()
         cur.close()
         conn.close()
@@ -550,7 +676,7 @@ def relatorio_diferencas():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        query = "SELECT * FROM relatorio_atendimento_carga_mv WHERE 1=1"
+        query = "SELECT * FROM relatorio_atendimento_carga_embarque_mv WHERE 1=1"
         parametros = []
 
         if obra:
@@ -562,14 +688,23 @@ def relatorio_diferencas():
             parametros.append(cargas)
 
         cur.execute(query, tuple(parametros))
-        resultado = cur.fetchall()
+        resultados = cur.fetchall()
 
-        colunas = [desc[0] for desc in cur.description]
-        dados_json = [dict(zip(colunas, linha)) for linha in resultado]
+        # 🔽 aqui você usa os índices conforme a ordem da sua materialized view
+        data = [{
+            "cod_insumo": r[0],
+            "produto": r[1],
+            "obra": r[2],
+            "cargas": r[3],
+            "total_necessario": r[4],
+            "bipado_fabrica": r[5],
+            "bipado_embarque": r[6],  # ✅ novo campo
+            "bipado_obra": r[7]
+        } for r in resultados]
 
         cur.close()
         conn.close()
-        return jsonify(dados_json)
+        return jsonify(data)
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
@@ -582,6 +717,20 @@ def excluir_qr_obra(id):
     cur = conn.cursor()
     try:
         cur.execute("DELETE FROM recebimento_obra WHERE id = %s", (id,))
+        conn.commit()
+        return jsonify({"sucesso": True})
+    except Exception as e:
+        return jsonify({"sucesso": False, "erro": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/excluir_qr_embarque/<int:id>', methods=['DELETE'])
+def excluir_qr_embarque(id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM registros_qr_embarque WHERE id = %s", (id,))
         conn.commit()
         return jsonify({"sucesso": True})
     except Exception as e:
@@ -653,7 +802,7 @@ def atualizar_view():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_mv;')
+        cur.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_embarque_mv;')
         conn.commit()
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -676,23 +825,6 @@ def listar_funcionarios():
 
 from flask import jsonify
 from sqlalchemy import text
-
-@app.route('/obras_disponiveis')
-def obras_disponiveis():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT DISTINCT obra FROM lista_de_carga ORDER BY obra")
-        resultados = cur.fetchall()
-        obras = [row[0] for row in resultados]
-        return jsonify(obras)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
 
 @app.route('/obras_disponiveis')
 def obras_disponiveis():
@@ -998,6 +1130,7 @@ def materiais_por_obra():
         conn.close()
 
 
+
 @app.route('/cargas_disponiveis')
 def cargas_disponiveis():
     obra = request.args.get("obra")
@@ -1085,3 +1218,4 @@ def relatorio_diferencas_interno(obra_filtro, carga_filtro):
 
 if __name__ == '__main__':
     app.run(debug=True)
+
