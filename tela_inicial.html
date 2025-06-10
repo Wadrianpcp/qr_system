@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMOL - Início</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #0C1C33;
+      color: #fff;
+      text-align: center;
+    }
+
+    .topo {
+      background-color: #fdf7f2;
+      padding: 30px 10px 10px;
+    }
+
+.logo-img {
+  max-height: 120px;
+  width: auto;
+}
+
+
+
+    .subtitulo {
+      color: #0C1C33;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .menu {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding: 60px 0;
+      flex-wrap: wrap;
+    }
+
+    .opcao {
+      background-color: #e60000;
+      border-radius: 16px;
+      padding: 30px 20px;
+      width: 160px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .opcao:hover {
+      transform: scale(1.05);
+      background-color: #c40000;
+    }
+
+    .opcao img {
+      width: 60px;
+      height: 60px;
+      margin-bottom: 10px;
+    }
+
+    .opcao p {
+      margin: 0;
+      font-size: 18px;
+      font-weight: bold;
+      color: white;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+  </style>
+</head>
+<body>
+
+<div class="topo">
+  <img src="/static/icons/logo.png" alt="Logo IMOL" class="logo-img">
+</div>
+
+
+  <div class="menu">
+    <a href="/maquinarios">
+      <div class="opcao">
+        <img src="/static/icons/maquinarios.png" alt="Maquinários">
+        <p>Maquinários</p>
+      </div>
+    </a>
+    <a href="/obra">
+      <div class="opcao">
+        <img src="/static/icons/obra.png" alt="Obra">
+        <p>Obra</p>
+      </div>
+    </a>
+    <a href="/">
+      <div class="opcao">
+        <img src="/static/icons/expedicao.png" alt="Expedição<">
+        <p>Expedição</p>
+      </div>
+    </a>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório de Produtividade</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #0C1C33;
+      color: white;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background-color: #eee;
+      color: #000;
+      padding: 15px;
+      border-radius: 15px;
+      text-align: center;
+    }
+
+    .card h3 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+
+    canvas {
+      background-color: #eee;
+      border-radius: 15px;
+      padding: 10px;
+    }
+
+    .filters {
+      margin-bottom: 30px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: space-around;
+    }
+
+    .filters div {
+      display: flex;
+      flex-direction: column;
+      color: white;
+    }
+
+    select, input[type="date"] {
+      padding: 5px;
+      border-radius: 5px;
+      border: none;
+      font-size: 14px;
+    }
+
+    #filtro_obra {
+      height: 130px;
+      width: 250px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Relatório de Produtividade</h1>
+
+<div class="filters">
+  <div>
+
+
+<div style="text-align: center; margin-top: 10px;">
+  <button onclick="limparFiltros()">Limpar Filtros</button>
+</div>
+
+
+    <label>Obra:</label>
+    <select id="filtro_obra" multiple></select>
+  </div>
+  <div>
+    <label>Data Início:</label>
+    <input type="date" id="data_inicio">
+  </div>
+  <div>
+    <label>Data Fim:</label>
+    <input type="date" id="data_fim">
+  </div>
+  <div>
+    <label>Tipo Corte:</label>
+    <select id="filtro_operacao">
+      <option value="">Todos</option>
+      <option>Plano</option>
+      <option>Ocorrência</option>
+      <option>Reposição</option>
+      <option>Assistência</option>
+      <option>Teste</option>
+    </select>
+  </div>
+<div class="form-group">
+  <label for="filtro_maquina">Máquina</label>
+  <select id="filtro_maquina">
+    <option value="">Todas</option>
+  </select>
+</div>
+  <div>
+    <label>Material:</label>
+    <select id="filtro_material" multiple size="6" style="width: 250px;"></select>
+   
+  <option value="">Selecione</option>
+</select>
+
+  </div>
+</div>
+
+<div class="dashboard">
+  <div class="card"><h3>Qtd Ch Cortadas</h3><div id="qtd_ch">--</div></div>
+  <div class="card"><h3>Qtd Horas Disponível</h3><div id="horas_disp">--</div></div>
+  <div class="card"><h3>Qtd Horas Trabalhadas</h3><div id="horas_trab">--</div></div>
+  <div class="card"><h3>Qtd Horas Parada</h3><div id="horas_parada">--</div></div>
+</div>
+
+<br><br>
+
+<div class="dashboard">
+  <div class="card" style="grid-column: span 2;">
+    <h3>Parada de Produção</h3>
+    <canvas id="grafico_parada" height="150"></canvas>
+  </div>
+  <div class="card" style="grid-column: span 2;">
+    <h3>Produção</h3>
+    <canvas id="grafico_producao" height="150"></canvas>
+  </div>
+</div>
+
+<script>
+function limparFiltros() {
+  document.getElementById("filtro_obra").selectedIndex = -1;
+  document.getElementById("data_inicio").value = "";
+  document.getElementById("data_fim").value = "";
+  document.getElementById("filtro_operacao").value = "";
+  document.getElementById("filtro_material").value = "";
+
+  carregarObras();
+  carregarMateriais();
+  atualizarRelatorio();
+}
+
+function formatarTempo(minutos) {
+  const h = Math.floor(minutos / 60);
+  const m = minutos % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+function carregarFiltros() {
+  carregarObras();
+  carregarMateriais();
+}
+
+function carregarObras() {
+  const dataInicio = document.getElementById("data_inicio").value;
+  const dataFim = document.getElementById("data_fim").value;
+  const maquina = document.getElementById("filtro_maquina").value;
+
+  let url = `/obras_disponiveis_produtividade?`;
+  if (dataInicio) url += `data_inicio=${dataInicio}&`;
+  if (dataFim) url += `data_fim=${dataFim}&`;
+  if (maquina) url += `maquina=${maquina}`;
+
+  fetch(url)
+    .then(res => res.json())
+    .then(obras => {
+      const select = document.getElementById("filtro_obra");
+      select.innerHTML = "";
+      obras.forEach(o => {
+        const option = document.createElement("option");
+        option.value = o;
+        option.textContent = o;
+        select.appendChild(option);
+      });
+    });
+}
+
+
+function carregarMaquinas() {
+  const dataInicio = document.getElementById("data_inicio").value;
+  const dataFim = document.getElementById("data_fim").value;
+  const select = document.getElementById("filtro_maquina");
+
+  let url = `/maquinas_disponiveis?`;
+  if (dataInicio) url += `data_inicio=${dataInicio}&`;
+  if (dataFim) url += `data_fim=${dataFim}`;
+
+  fetch(url)
+    .then(res => res.json())
+    .then(maquinas => {
+      select.innerHTML = '<option value="">Todas</option>';
+      maquinas.forEach(m => {
+        const option = document.createElement("option");
+        option.value = m;
+        option.textContent = m;
+        select.appendChild(option);
+      });
+    });
+}
+
+function carregarFiltros() {
+  carregarObras();
+  carregarMateriais();
+  carregarMaquinas();  // ⬅ aqui!
+}
+
+function carregarMateriais() {
+  const obrasSelecionadas = Array.from(document.getElementById("filtro_obra").selectedOptions).map(opt => opt.value);
+  const matSel = document.getElementById("filtro_material");
+
+  if (obrasSelecionadas.length === 0) {
+    // Nenhuma obra filtrada → carrega todos os materiais
+    fetch('/materiais_disponiveis')
+      .then(res => res.json())
+      .then(materiais => {
+        matSel.innerHTML = '<option value="">Todos</option>';
+        materiais.forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          matSel.appendChild(opt);
+        });
+      });
+  } else {
+    // Obra(s) selecionada(s) → filtra materiais por obra
+    const params = new URLSearchParams();
+    obrasSelecionadas.forEach(o => params.append("obras[]", o));
+
+    const url = `/materiais_por_obra?${params.toString()}`;
+
+    fetch(url)
+      .then(res => res.json())
+      .then(materiais => {
+        matSel.innerHTML = '<option value="">Todos</option>';
+        materiais.forEach(m => {
+          const opt = document.createElement("option");
+          opt.value = m;
+          opt.textContent = m;
+          matSel.appendChild(opt);
+        });
+      });
+  }
+}
+
+
+function atualizarRelatorio() {
+  const filtros = {
+    obra: Array.from(document.getElementById("filtro_obra").selectedOptions).map(opt => opt.value),
+    data_inicio: document.getElementById("data_inicio").value,
+    data_fim: document.getElementById("data_fim").value,
+    operacao: document.getElementById("filtro_operacao").value,
+    material: document.getElementById("filtro_material").value,
+    maquina: document.getElementById("filtro_maquina").value
+  };
+
+  fetch('/dados_relatorio_produtividade', {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(filtros)
+  })
+    .then(res => res.json())
+    .then(dados => {
+      document.getElementById("qtd_ch").textContent = dados.qtd_ch;
+      document.getElementById("horas_disp").textContent = formatarTempo(dados.horas_disp || 0);
+      document.getElementById("horas_parada").textContent = formatarTempo(dados.horas_parada || 0);
+      document.getElementById("horas_trab").textContent = formatarTempo(dados.horas_trab || 0);
+
+      atualizarGraficoParada(dados.paradas);
+      atualizarGraficoProducao(dados.producao);
+    })
+    .catch(err => console.error("Erro ao carregar relatório:", err));
+}
+
+let chartParada, chartProducao;
+
+function atualizarGraficoParada(paradas) {
+  const ctx = document.getElementById("grafico_parada").getContext("2d");
+  const labels = paradas.map(p => p.ocorrencia);
+  const tempos = paradas.map(p => p.minutos);
+
+  if (chartParada) chartParada.destroy();
+  chartParada = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Tempo (min)',
+        data: tempos,
+        backgroundColor: '#b71c1c'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+function atualizarGraficoProducao(producao) {
+  const ctx = document.getElementById("grafico_producao").getContext("2d");
+  const labels = producao.map(p => p.data);
+  const quantidades = producao.map(p => p.qtd);
+
+  if (chartProducao) chartProducao.destroy();
+  chartProducao = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Qtd Cortadas',
+        data: quantidades,
+        backgroundColor: '#880e4f'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+window.onload = () => {
+  carregarFiltros();
+  atualizarRelatorio();
+
+document.getElementById("filtro_maquina").addEventListener("change", () => {
+  carregarObras();
+  carregarMateriais();
+  atualizarRelatorio();
+});
+
+
+  document.getElementById("data_inicio").addEventListener("change", () => {
+    carregarObras();
+    carregarMateriais();
+    atualizarRelatorio();
+  });
+
+  document.getElementById("data_fim").addEventListener("change", () => {
+    carregarObras();
+    carregarMateriais();
+    atualizarRelatorio();
+  });
+
+  document.getElementById("filtro_obra").addEventListener("change", () => {
+    carregarMateriais();
+    atualizarRelatorio();
+  });
+
+
+  document.getElementById("filtro_material").addEventListener("change", () => {
+    carregarObras();      // atualiza as obras que usam esse material
+    atualizarRelatorio(); // atualiza os dados
+  });
+
+
+  document.querySelectorAll(".filters select, .filters input").forEach(el => {
+    el.addEventListener("change", atualizarRelatorio);
+  });
+};
+</script>
+</body>
+</html>
