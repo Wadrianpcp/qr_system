@@ -24,9 +24,11 @@ def get_db_connection():
 def index():
     return send_file('index.html')
 
+
 @app.route('/grafico_nes')
 def grafico_nes():
     return send_file('grafico_nes.html')
+
 
 @app.route('/inicio')
 def tela_inicial():
@@ -35,10 +37,6 @@ def tela_inicial():
 @app.route('/produtividade')
 def produtividade():
     return send_file('produtividade.html')
-
-@app.route('/etiquetas')
-def etiquetas():
-    return send_file('etiquetas.html')
 
 @app.route('/grafico_auto')
 def grafico_auto():
@@ -65,6 +63,10 @@ def registros():
 def registros_obra():
     return send_file('registros_obra.html')
 
+@app.route('/registros embarque')
+def registros_embarque():
+    return send_file('registros embarque.html')
+
 @app.route('/relatorio_obra')
 def relatorio_obra():
     return send_file('relatorio.html')
@@ -80,6 +82,10 @@ def lista_carga():
 @app.route('/relatorio')
 def relatorio():
     return send_file('relatorio.html')
+
+@app.route('/registrar_embarque')
+def registrar_embarque():
+    return send_file('Embarque.html')
 
 
 @app.route('/operadores')
