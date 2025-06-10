@@ -82,53 +82,6 @@ def relatorio():
     return send_file('relatorio.html')
 
 
-@app.route('/dados_grafico', methods=['POST'])
-def dados_grafico():
-    data = request.get_json()
-    obra = data.get('obra')
-    cargas = data.get('cargas', [])
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    # Atualiza a view antes de consultar
-    cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_mv;")
-
-    query = """
-        SELECT 
-            SUM(total_necessario) AS total_carga,
-            SUM(bipado_fabrica) AS bipado_fabrica,
-            SUM(bipado_obra) AS bipado_obra
-        FROM relatorio_atendimento_carga_mv
-        WHERE 1=1
-    """
-    params = []
-
-    if obra:
-        query += " AND obra = %s"
-        params.append(obra)
-    if cargas:
-        query += " AND cargas = ANY(%s)"
-        params.append(cargas)
-
-    cur.execute(query, tuple(params))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    total_carga = row[0] or 0
-    bipado_fabrica = row[1] or 0
-    bipado_obra = row[2] or 0
-    nao_bipado = total_carga - bipado_fabrica
-
-    return jsonify({
-        'total_carga': total_carga,
-        'bipado_fabrica': bipado_fabrica,
-        'bipado_obra': bipado_obra,
-        'nao_bipado': max(0, nao_bipado)
-    })
-
-
 @app.route('/operadores')
 def operadores():
     conn = get_db_connection()
@@ -143,6 +96,7 @@ def operadores():
     finally:
         cur.close()
         conn.close()
+
 
 @app.route('/soma_horas_disponivel')
 def soma_horas_disponivel():
@@ -303,8 +257,6 @@ def obras_lotes():
     finally:
         cur.close()
         conn.close()
-
-
 
 @app.route('/registrar_qr', methods=['POST'])
 def registrar_qr():
