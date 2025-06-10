@@ -24,9 +24,19 @@ def get_db_connection():
 def index():
     return send_file('index.html')
 
-@app.route('/etiquetas')
-def etiquetas():
-    return send_file('etiquetas.html')
+
+@app.route('/grafico_nes')
+def grafico_nes():
+    return send_file('grafico_nes.html')
+
+
+@app.route('/inicio')
+def tela_inicial():
+    return send_file('tela_inicial.html')
+
+@app.route('/produtividade')
+def produtividade():
+    return send_file('produtividade.html')
 
 @app.route('/grafico_auto')
 def grafico_auto():
@@ -53,6 +63,10 @@ def registros():
 def registros_obra():
     return send_file('registros_obra.html')
 
+@app.route('/registros embarque')
+def registros_embarque():
+    return send_file('registros embarque.html')
+
 @app.route('/relatorio_obra')
 def relatorio_obra():
     return send_file('relatorio.html')
@@ -68,6 +82,189 @@ def lista_carga():
 @app.route('/relatorio')
 def relatorio():
     return send_file('relatorio.html')
+
+@app.route('/registrar_embarque')
+def registrar_embarque():
+    return send_file('Embarque.html')
+
+
+@app.route('/operadores')
+def operadores():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, operadores FROM operadores ORDER BY operadores")
+        resultados = cur.fetchall()
+        dados = [{"id": r[0], "operadores": r[1]} for r in resultados]
+        return jsonify(dados)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/soma_horas_disponivel')
+def soma_horas_disponivel():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT SUM(EXTRACT(EPOCH FROM horas_disponivel) / 3600) AS total_horas
+            FROM registro_produtividade
+        """)
+        total = cur.fetchone()[0] or 0
+
+        cur.close()
+        conn.close()
+
+        return jsonify({"total_horas_disponivel": round(total, 2)})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+@app.route('/maquinas_disponiveis')
+def maquinas_disponiveis():
+    data_inicio = request.args.get("data_inicio")
+    data_fim = request.args.get("data_fim")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        query = """
+            SELECT DISTINCT maquina
+            FROM registro_produtividade
+            WHERE maquina IS NOT NULL AND maquina <> ''
+        """
+        params = []
+
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+
+        query += " ORDER BY maquina"
+
+        cur.execute(query, params)
+        maquinas = [r[0] for r in cur.fetchall()]
+        return jsonify(maquinas)
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/registrar_produtividade', methods=['POST'])
+def registrar_produtividade():
+    data = request.get_json()
+
+    operacao = data.get("operacao")
+    obra = data.get("obra")
+    ocorrencia = data.get("ocorrencia")
+    hr_inicio = data.get("hr_inicio")
+    hr_fim = data.get("hr_fim")
+    data_registro = data.get("data")
+    operador = data.get("operador")  # ID ou nome, depende de como está no HTML
+    material = data.get("material")
+    maquina = dados.get("maquina")
+
+    try:
+        qtd_ch = int(data.get("qtd_ch")) if data.get("qtd_ch") not in ("", None) else 0
+    except ValueError:
+        qtd_ch = 0
+
+    try:
+        # Calcula duração da hora
+        h_inicio = datetime.strptime(hr_inicio, "%H:%M")
+        h_fim = datetime.strptime(hr_fim, "%H:%M")
+        duracao = h_fim - h_inicio
+        if duracao.total_seconds() < 0:
+            duracao += timedelta(days=1)
+
+        horas_disponivel = str(duracao)
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO registro_produtividade (
+                operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
+                data, operador, material, horas_disponivel, maquina
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            operacao, obra, ocorrencia, hr_inicio, hr_fim,
+            qtd_ch, data_registro, operador, material, horas_disponivel, maquina
+        ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({"sucesso": True})
+
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+
+
+
+
+@app.route('/material')
+def material():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, material FROM material ORDER BY material")
+        resultados = cur.fetchall()
+        dados = [{"id": r[0], "material": r[1]} for r in resultados]
+        return jsonify(dados)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/ocorrencia')
+def ocorrencia():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, ocorrencia FROM ocorrencia ORDER BY ocorrencia")
+        resultados = cur.fetchall()
+        dados = [{"id": r[0], "ocorrencia": r[1]} for r in resultados]
+        return jsonify(dados)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+
+@app.route('/obras_lotes')
+def obras_lotes():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT DISTINCT obra, lote FROM obras_lotes ORDER BY obra, lote")
+        resultados = cur.fetchall()
+        dados = [{"obra": r[0], "lote": r[1]} for r in resultados]
+        return jsonify(dados)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 
 
 @app.route('/dados_grafico', methods=['POST'])
