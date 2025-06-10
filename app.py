@@ -172,7 +172,7 @@ def registrar_produtividade():
     data_registro = data.get("data")
     operador = data.get("operador")  # ID ou nome, depende de como está no HTML
     material = data.get("material")
-    maquina = dados.get("maquina")
+    maquina = data.get("maquina")
 
     try:
         qtd_ch = int(data.get("qtd_ch")) if data.get("qtd_ch") not in ("", None) else 0
