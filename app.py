@@ -1215,6 +1215,49 @@ def relatorio_diferencas_interno(obra_filtro, carga_filtro):
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
+@app.route('/listar_registros_produtividade', methods=['GET'])
+def listar_registros_produtividade():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        maquina = request.args.get("maquina")
+        valores = []
+        where_clause = ""
+
+        if maquina:
+            where_clause = "WHERE maquina = %s"
+            valores.append(maquina)
+
+        cur.execute(f"""
+            SELECT id, operacao, obra, qtd_ch, hr_inicio, hr_fim, operador, maquina, data, ocorrencia
+            FROM registro_produtividade
+            {where_clause}
+            ORDER BY id DESC
+        """, tuple(valores))
+
+        registros = cur.fetchall()
+
+        dados = []
+        for r in registros:
+            dados.append({
+                "id": r[0],
+                "operacao": r[1],
+                "obra": r[2],
+                "qtd_ch": r[3],
+                "hr_inicio": r[4].strftime("%H:%M") if r[4] else "",
+                "hr_fim": r[5].strftime("%H:%M") if r[5] else "",
+                "operador": r[6],
+                "maquina": r[7],
+                "data": r[8].strftime("%d/%m/%Y") if r[8] else "",
+                "ocorrencia": r[9] or ""
+            })
+
+        return jsonify({"data": dados})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == '__main__':
     app.run(debug=True)
