@@ -167,7 +167,7 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script>
-  let operadorAnterior = ""; // <- operador salvo entre lançamentos
+  let operadorAnterior = "";
 
   function carregarSelects(preservarMaquina = true, preservarOperador = true) {
     const maquinaAtual = document.getElementById("maquina").value;
@@ -251,290 +251,7 @@
 
   operacaoSelect.addEventListener('change', atualizarRegras);
   window.addEventListener('DOMContentLoaded', () => {
-    carregarSelects(false, false); // primeira vez: não preserva
-    atualizarRegras();
-  });
-
-  document.getElementById("produtividadeForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-
-    const operacao = operacaoSelect.value;
-    const obra = obraSelect.value;
-    const ocorrencia = ocorrenciaSelect.value;
-    const hr_inicio = document.getElementById("hr_inicio").value;
-    const hr_fim = document.getElementById("hr_fim").value;
-    const qtd_ch = qtdChInput.value;
-    const data = document.getElementById("data").value;
-    const operador = document.getElementById("operador").value;
-    const material = materialSelect.value;
-    const maquina = document.getElementById("maquina").value;
-
-    if (!operacao || !hr_inicio || !hr_fim || !data || !operador) {
-      alert("Preencha todos os campos obrigatórios.");
-      return;
-    }
-
-    if (["Assistência", "Plano", "Reposição", "Teste"].includes(operacao)) {
-      if (!obra || !material || !qtd_ch) {
-        alert("Preencha Obra, Material e Qtd Ch.");
-        return;
-      }
-    } else if (operacao === "Ocorrência" && !ocorrencia) {
-      alert("Selecione uma Ocorrência.");
-      r<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="UTF-8">
-  <title>Lançamento de Produtividade</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-      padding: 30px;
-      color: #333;
-    }
-    h2 {
-      text-align: center;
-    }
-    form {
-      max-width: 900px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    .form-row {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      margin-bottom: 15px;
-    }
-    .form-group {
-      flex: 1 1 30%;
-      min-width: 200px;
-      padding: 5px;
-    }
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-    input, select {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-    .buttons {
-      text-align: center;
-      margin-top: 20px;
-    }
-    button {
-      padding: 10px 20px;
-      margin: 0 10px;
-      background-color: #1976d2;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #125ca1;
-    }
-    table {
-      width: 100%;
-      margin-top: 40px;
-      background: white;
-      border-collapse: collapse;
-    }
-    th, td {
-      padding: 8px;
-      border: 1px solid #ccc;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-
-<h2>Lançamento de Produtividade</h2>
-
-<form id="produtividadeForm">
-  <div class="form-row">
-    <div class="form-group">
-      <label for="operacao">Operação</label>
-      <select id="operacao" required>
-        <option value="">Selecione</option>
-        <option value="Assistência">Assistência</option>
-        <option value="Ocorrência">Ocorrência</option>
-        <option value="Plano">Plano</option>
-        <option value="Reposição">Reposição</option>
-        <option value="Teste">Teste</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label for="obra">Obra</label>
-      <select id="obra" required></select>
-    </div>
-    <div class="form-group">
-      <label for="ocorrencia">Ocorrência</label>
-      <select id="ocorrencia" required></select>
-    </div>
-  </div>
-
-  <div class="form-row">
-    <div class="form-group">
-      <label for="hr_inicio">Hr Inicial</label>
-      <input type="time" id="hr_inicio" required>
-    </div>
-    <div class="form-group">
-      <label for="hr_fim">Hr Final</label>
-      <input type="time" id="hr_fim" required>
-    </div>
-    <div class="form-group">
-      <label for="qtd_ch">Qtd Ch</label>
-      <input type="number" id="qtd_ch" required>
-    </div>
-    <div class="form-group">
-      <label for="maquina">Máquina</label>
-      <select id="maquina" required>
-        <option value="">Selecione</option>
-        <option value="Nes01">Nes01</option>
-        <option value="Nes02">Nes02</option>
-        <option value="Sec01">Sec01</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="form-row">
-    <div class="form-group">
-      <label for="data">Data</label>
-      <input type="date" id="data" required>
-    </div>
-    <div class="form-group">
-      <label for="operador">Operador</label>
-      <select id="operador" required></select>
-    </div>
-    <div class="form-group">
-      <label for="material">Material</label>
-      <select id="material" required></select>
-    </div>
-  </div>
-
-  <div class="buttons">
-    <button type="submit">Salvar</button>
-    <button type="reset">Limpar formulário</button>
-  </div>
-</form>
-
-<h3 style="text-align: center;">Registros de Lançamento</h3>
-<table id="tabelaRegistros" class="display">
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>Operação</th>
-      <th>Obra</th>
-      <th>Qtd Ch</th>
-      <th>Hr Início</th>
-      <th>Hr Final</th>
-      <th>Operador</th>
-      <th>Máquina</th>
-      <th>Data</th>
-      <th>Ocorrência</th>
-    </tr>
-  </thead>
-</table>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script>
-  let operadorAnterior = ""; // <- operador salvo entre lançamentos
-
-  function carregarSelects(preservarMaquina = true, preservarOperador = true) {
-    const maquinaAtual = document.getElementById("maquina").value;
-
-    fetch('/obras_lotes').then(res => res.json()).then(data => {
-      const select = document.getElementById("obra");
-      select.innerHTML = '<option value="">Selecione</option>';
-      data.forEach(item => {
-        const option = document.createElement("option");
-        option.value = `${item.obra} - ${item.lote}`;
-        option.textContent = `${item.obra} - ${item.lote}`;
-        select.appendChild(option);
-      });
-    });
-
-    fetch('/ocorrencia').then(res => res.json()).then(data => {
-      const select = document.getElementById("ocorrencia");
-      select.innerHTML = '<option value="">Selecione</option>';
-      data.forEach(item => {
-        const option = document.createElement("option");
-        option.value = item.ocorrencia;
-        option.textContent = item.ocorrencia;
-        select.appendChild(option);
-      });
-    });
-
-    fetch('/operadores').then(res => res.json()).then(data => {
-      const select = document.getElementById("operador");
-      const valorSelecionado = preservarOperador ? operadorAnterior : "";
-      select.innerHTML = '<option value="">Selecione</option>';
-      data.forEach(item => {
-        const option = document.createElement("option");
-        option.value = item.operadores;
-        option.textContent = item.operadores;
-        if (item.operadores === valorSelecionado) {
-          option.selected = true;
-        }
-        select.appendChild(option);
-      });
-    });
-
-    fetch('/material').then(res => res.json()).then(data => {
-      const select = document.getElementById("material");
-      select.innerHTML = '<option value="">Selecione</option>';
-      data.forEach(item => {
-        const option = document.createElement("option");
-        option.value = item.material;
-        option.textContent = item.material;
-        select.appendChild(option);
-      });
-    });
-
-    if (preservarMaquina) {
-      document.getElementById("maquina").value = maquinaAtual;
-    }
-  }
-
-  const operacaoSelect = document.getElementById('operacao');
-  const ocorrenciaSelect = document.getElementById('ocorrencia');
-  const obraSelect = document.getElementById('obra');
-  const materialSelect = document.getElementById('material');
-  const qtdChInput = document.getElementById('qtd_ch');
-
-  function atualizarRegras() {
-    const operacao = operacaoSelect.value;
-    const isAssistenciaOuPlano = ["Assistência", "Plano", "Reposição", "Teste"].includes(operacao);
-    const isOcorrencia = operacao === "Ocorrência";
-
-    ocorrenciaSelect.disabled = isAssistenciaOuPlano;
-    if (isAssistenciaOuPlano) ocorrenciaSelect.value = "";
-
-    obraSelect.disabled = isOcorrencia;
-    materialSelect.disabled = isOcorrencia;
-    qtdChInput.disabled = isOcorrencia;
-    if (isOcorrencia) {
-      obraSelect.value = "";
-      materialSelect.value = "";
-      qtdChInput.value = "";
-    }
-  }
-
-  operacaoSelect.addEventListener('change', atualizarRegras);
-  window.addEventListener('DOMContentLoaded', () => {
-    carregarSelects(false, false); // primeira vez: não preserva
+    carregarSelects(false, false);
     atualizarRegras();
   });
 
@@ -567,7 +284,7 @@
       return;
     }
 
-    operadorAnterior = operador; // <=== salva o operador atual
+    operadorAnterior = operador;
 
     fetch('/registrar_produtividade', {
       method: "POST",
@@ -593,7 +310,7 @@
 
         atualizarRegras();
         $('#tabelaRegistros').DataTable().ajax.reload();
-        carregarSelects(true, true); // <- preserva operador e máquina
+        carregarSelects(true, true);
       } else {
         alert("Erro ao registrar: " + (data.erro || "Erro desconhecido"));
       }
@@ -634,7 +351,5 @@
   });
 </script>
 
-
 </body>
 </html>
-
