@@ -215,42 +215,29 @@ function carregarFiltros() {
 
 function carregarMateriais() {
   const obrasSelecionadas = Array.from(document.getElementById("filtro_obra").selectedOptions).map(opt => opt.value);
+  const dataInicio = document.getElementById("data_inicio").value;
+  const dataFim = document.getElementById("data_fim").value;
+  const maquina = document.getElementById("filtro_maquina").value;
   const matSel = document.getElementById("filtro_material");
 
-  if (obrasSelecionadas.length === 0) {
-    // Nenhuma obra filtrada → carrega todos os materiais
-    fetch('/materiais_disponiveis')
-      .then(res => res.json())
-      .then(materiais => {
-        matSel.innerHTML = '<option value="">Todos</option>';
-        materiais.forEach(m => {
-          const opt = document.createElement("option");
-          opt.value = m;
-          opt.textContent = m;
-          matSel.appendChild(opt);
-        });
-      });
-  } else {
-    // Obra(s) selecionada(s) → filtra materiais por obra
-    const params = new URLSearchParams();
-    obrasSelecionadas.forEach(o => params.append("obras[]", o));
+  const params = new URLSearchParams();
+  if (dataInicio) params.append("data_inicio", dataInicio);
+  if (dataFim) params.append("data_fim", dataFim);
+  if (maquina && maquina !== "Todos") params.append("maquina", maquina);
+  obrasSelecionadas.forEach(o => params.append("obras[]", o));
 
-    const url = `/materiais_por_obra?${params.toString()}`;
-
-    fetch(url)
-      .then(res => res.json())
-      .then(materiais => {
-        matSel.innerHTML = '<option value="">Todos</option>';
-        materiais.forEach(m => {
-          const opt = document.createElement("option");
-          opt.value = m;
-          opt.textContent = m;
-          matSel.appendChild(opt);
-        });
+  fetch(`/materiais_por_maquina?${params.toString()}`)
+    .then(res => res.json())
+    .then(materiais => {
+      matSel.innerHTML = '<option value="">Todos</option>';
+      materiais.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        matSel.appendChild(opt);
       });
-  }
+    });
 }
-
 
 function atualizarRelatorio() {
   const filtros = {
