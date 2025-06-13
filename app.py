@@ -1259,6 +1259,47 @@ def listar_registros_produtividade():
         cur.close()
         conn.close()
 
+@app.route('/materiais_por_maquina')
+def materiais_por_maquina():
+    maquina = request.args.get("maquina")
+    data_inicio = request.args.get("data_inicio")
+    data_fim = request.args.get("data_fim")
+    obras = request.args.getlist("obras[]")
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    query = """
+        SELECT DISTINCT material
+        FROM registro_produtividade
+        WHERE material IS NOT NULL
+    """
+    params = []
+
+    if maquina:
+        query += " AND maquina = %s"
+        params.append(maquina)
+    if obras:
+        query += " AND obra = ANY(%s)"
+        params.append(obras)
+    if data_inicio:
+        query += " AND data >= %s"
+        params.append(data_inicio)
+    if data_fim:
+        query += " AND data <= %s"
+        params.append(data_fim)
+
+    query += " ORDER BY material"
+
+    cur.execute(query, tuple(params))
+    materiais = [row[0] for row in cur.fetchall()]
+
+    cur.close()
+    conn.close()
+
+    return jsonify(materiais)
+
+
 if __name__ == '__main__':
     app.run(debug=True)
 
