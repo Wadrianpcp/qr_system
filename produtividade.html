@@ -148,20 +148,21 @@
 
 <h3 style="text-align: center;">Registros de Lançamento</h3>
 <table id="tabelaRegistros" class="display">
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>Operação</th>
-      <th>Obra</th>
-      <th>Qtd Ch</th>
-      <th>Hr Início</th>
-      <th>Hr Final</th>
-      <th>Operador</th>
-      <th>Máquina</th>
-      <th>Data</th>
-      <th>Ocorrência</th>
-    </tr>
-  </thead>
+<thead>
+  <tr>
+    <th>ID</th>
+    <th>Operação</th>
+    <th>Obra</th>
+    <th>Qtd Ch</th>
+    <th>Hr Início</th>
+    <th>Hr Final</th>
+    <th>Operador</th>
+    <th>Máquina</th>
+    <th>Data</th>
+    <th>Ocorrência</th>
+    <th>Ação</th> <!-- nova coluna -->
+  </tr>
+</thead>
 </table>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -286,8 +287,12 @@
 
     operadorAnterior = operador;
 
-    fetch('/registrar_produtividade', {
-      method: "POST",
+    const idEdicao = document.getElementById("produtividadeForm").getAttribute("data-edicao-id");
+    const url = idEdicao ? `/atualizar_produtividade/${idEdicao}` : '/registrar_produtividade';
+    const metodo = idEdicao ? "PUT" : "POST";
+
+    fetch(url, {
+      method: metodo,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
@@ -298,19 +303,17 @@
     .then(data => {
       if (data.sucesso) {
         alert("Produtividade registrada com sucesso!");
-
         operacaoSelect.value = "";
         obraSelect.value = "";
         ocorrenciaSelect.value = "";
         qtdChInput.value = "";
         materialSelect.value = "";
-
         document.getElementById("hr_inicio").value = hr_fim;
         document.getElementById("hr_fim").value = "";
-
         atualizarRegras();
         $('#tabelaRegistros').DataTable().ajax.reload();
         carregarSelects(true, true);
+        document.getElementById("produtividadeForm").removeAttribute("data-edicao-id");
       } else {
         alert("Erro ao registrar: " + (data.erro || "Erro desconhecido"));
       }
@@ -340,7 +343,16 @@
         { data: "operador" },
         { data: "maquina" },
         { data: "data" },
-        { data: "ocorrencia" }
+        { data: "ocorrencia" },
+        {
+          data: null,
+          render: function (data, type, row) {
+            return `
+              <button onclick="editarRegistro(${row.id})">Editar</button>
+              <button onclick="excluirRegistro(${row.id})" style="margin-left:5px; background-color:#d32f2f; color:white;">Excluir</button>
+            `;
+          }
+        }
       ],
       order: [[0, "desc"]]
     });
@@ -349,7 +361,55 @@
       tabela.ajax.reload();
     });
   });
+
+  function editarRegistro(id) {
+    fetch(`/obter_registro/${id}`)
+      .then(res => res.json())
+      .then(dados => {
+        if (dados.erro) {
+          alert("Registro não encontrado.");
+          return;
+        }
+
+        document.getElementById("operacao").value = dados.operacao;
+        document.getElementById("obra").value = dados.obra;
+        document.getElementById("ocorrencia").value = dados.ocorrencia || "";
+        document.getElementById("hr_inicio").value = dados.hr_inicio;
+        document.getElementById("hr_fim").value = dados.hr_fim;
+        document.getElementById("qtd_ch").value = dados.qtd_ch;
+        document.getElementById("data").value = dados.data;
+        document.getElementById("operador").value = dados.operador;
+        document.getElementById("material").value = dados.material;
+        document.getElementById("maquina").value = dados.maquina;
+
+        document.getElementById("produtividadeForm").setAttribute("data-edicao-id", id);
+        atualizarRegras();
+      });
+  }
+
+  function excluirRegistro(id) {
+    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
+
+    fetch(`/excluir_registro/${id}`, {
+      method: "DELETE"
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.sucesso) {
+        alert("Registro excluído com sucesso!");
+        $('#tabelaRegistros').DataTable().ajax.reload();
+      } else {
+        alert("Erro ao excluir registro: " + (data.erro || "Erro desconhecido"));
+      }
+    })
+    .catch(err => {
+      alert("Erro na comunicação com o servidor.");
+      console.error(err);
+    });
+  }
 </script>
+
 
 </body>
 </html>
+
