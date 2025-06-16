@@ -24,19 +24,9 @@ def get_db_connection():
 def index():
     return send_file('index.html')
 
-
-@app.route('/grafico_nes')
-def grafico_nes():
-    return send_file('grafico_nes.html')
-
-
-@app.route('/inicio')
-def tela_inicial():
-    return send_file('tela_inicial.html')
-
-@app.route('/produtividade')
-def produtividade():
-    return send_file('produtividade.html')
+@app.route('/etiquetas')
+def etiquetas():
+    return send_file('etiquetas.html')
 
 @app.route('/grafico_auto')
 def grafico_auto():
@@ -63,10 +53,6 @@ def registros():
 def registros_obra():
     return send_file('registros_obra.html')
 
-@app.route('/registros embarque')
-def registros_embarque():
-    return send_file('registros embarque.html')
-
 @app.route('/relatorio_obra')
 def relatorio_obra():
     return send_file('relatorio.html')
@@ -88,184 +74,6 @@ def registrar_embarque():
     return send_file('Embarque.html')
 
 
-@app.route('/operadores')
-def operadores():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT id, operadores FROM operadores ORDER BY operadores")
-        resultados = cur.fetchall()
-        dados = [{"id": r[0], "operadores": r[1]} for r in resultados]
-        return jsonify(dados)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-@app.route('/soma_horas_disponivel')
-def soma_horas_disponivel():
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT SUM(EXTRACT(EPOCH FROM horas_disponivel) / 3600) AS total_horas
-            FROM registro_produtividade
-        """)
-        total = cur.fetchone()[0] or 0
-
-        cur.close()
-        conn.close()
-
-        return jsonify({"total_horas_disponivel": round(total, 2)})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-
-
-@app.route('/maquinas_disponiveis')
-def maquinas_disponiveis():
-    data_inicio = request.args.get("data_inicio")
-    data_fim = request.args.get("data_fim")
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        query = """
-            SELECT DISTINCT maquina
-            FROM registro_produtividade
-            WHERE maquina IS NOT NULL AND maquina <> ''
-        """
-        params = []
-
-        if data_inicio:
-            query += " AND data >= %s"
-            params.append(data_inicio)
-        if data_fim:
-            query += " AND data <= %s"
-            params.append(data_fim)
-
-        query += " ORDER BY maquina"
-
-        cur.execute(query, params)
-        maquinas = [r[0] for r in cur.fetchall()]
-        return jsonify(maquinas)
-
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-@app.route('/registrar_produtividade', methods=['POST'])
-def registrar_produtividade():
-    data = request.get_json()
-
-    operacao = data.get("operacao")
-    obra = data.get("obra")
-    ocorrencia = data.get("ocorrencia")
-    hr_inicio = data.get("hr_inicio")
-    hr_fim = data.get("hr_fim")
-    data_registro = data.get("data")
-    operador = data.get("operador")  # ID ou nome, depende de como está no HTML
-    material = data.get("material")
-    maquina = data.get("maquina")
-
-    try:
-        qtd_ch = int(data.get("qtd_ch")) if data.get("qtd_ch") not in ("", None) else 0
-    except ValueError:
-        qtd_ch = 0
-
-    try:
-        # Calcula duração da hora
-        h_inicio = datetime.strptime(hr_inicio, "%H:%M")
-        h_fim = datetime.strptime(hr_fim, "%H:%M")
-        duracao = h_fim - h_inicio
-        if duracao.total_seconds() < 0:
-            duracao += timedelta(days=1)
-
-        horas_disponivel = str(duracao)
-
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        cur.execute("""
-            INSERT INTO registro_produtividade (
-                operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
-                data, operador, material, horas_disponivel, maquina
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            operacao, obra, ocorrencia, hr_inicio, hr_fim,
-            qtd_ch, data_registro, operador, material, horas_disponivel, maquina
-        ))
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        return jsonify({"sucesso": True})
-
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-
-
-
-
-
-
-@app.route('/material')
-def material():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT id, material FROM material ORDER BY material")
-        resultados = cur.fetchall()
-        dados = [{"id": r[0], "material": r[1]} for r in resultados]
-        return jsonify(dados)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-@app.route('/ocorrencia')
-def ocorrencia():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT id, ocorrencia FROM ocorrencia ORDER BY ocorrencia")
-        resultados = cur.fetchall()
-        dados = [{"id": r[0], "ocorrencia": r[1]} for r in resultados]
-        return jsonify(dados)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-
-@app.route('/obras_lotes')
-def obras_lotes():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT DISTINCT obra, lote FROM obras_lotes ORDER BY obra, lote")
-        resultados = cur.fetchall()
-        dados = [{"obra": r[0], "lote": r[1]} for r in resultados]
-        return jsonify(dados)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-
 @app.route('/dados_grafico', methods=['POST'])
 def dados_grafico():
     data = request.get_json()
@@ -276,14 +84,14 @@ def dados_grafico():
     cur = conn.cursor()
 
     # Atualiza a view antes de consultar
-    cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_embarque_mv;")
+    cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_mv;")
 
     query = """
         SELECT 
             SUM(total_necessario) AS total_carga,
             SUM(bipado_fabrica) AS bipado_fabrica,
             SUM(bipado_obra) AS bipado_obra
-        FROM relatorio_atendimento_carga_embarque_mv
+        FROM relatorio_atendimento_carga_mv
         WHERE 1=1
     """
     params = []
@@ -435,71 +243,6 @@ def listar_qr_filtros():
         for r in dados
         if r[0] and r[1]
     ])
-
-
-@app.route('/listar_qr_embarque', methods=['GET'])
-def listar_qr_embarque_server_side():
-    draw = int(request.args.get('draw', 1))
-    start = int(request.args.get('start', 0))
-    length = int(request.args.get('length', 10))
-    filtro_qr = request.args.get('filtroQR', '').strip()
-    filtro_usuario = request.args.get('filtroUsuario', '').strip()
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    where_clauses = []
-    valores = []
-
-    if filtro_qr:
-        where_clauses.append("codigo_qr ILIKE %s")
-        valores.append(f"%{filtro_qr}%")
-
-    if filtro_usuario:
-        where_clauses.append("usuario = %s")
-        valores.append(filtro_usuario)
-
-    where_sql = " AND ".join(where_clauses)
-    if where_sql:
-        where_sql = "WHERE " + where_sql
-
-    # Total de registros (sem filtro)
-    cur.execute("SELECT COUNT(*) FROM registros_qr_embarque")
-    records_total = cur.fetchone()[0]
-
-    # Total de registros filtrados
-    cur.execute(f"SELECT COUNT(*) FROM registros_qr_embarque {where_sql}", tuple(valores))
-    records_filtered = cur.fetchone()[0]
-
-    # Dados da página
-    cur.execute(f"""
-        SELECT id, codigo_qr, usuario, data_hora
-        FROM registros_qr_embarque
-        {where_sql}
-        ORDER BY data_hora DESC
-        LIMIT %s OFFSET %s
-    """, (*valores, length, start))
-    dados = cur.fetchall()
-
-    tz = pytz.timezone('America/Sao_Paulo')
-    data = [{
-        "id": r[0],
-        "codigo_qr": r[1],
-        "usuario": r[2],
-        "data_hora": r[3].replace(tzinfo=pytz.utc).astimezone(tz).strftime('%d/%m/%Y %H:%M:%S') if r[3] else ""
-    } for r in dados]
-
-    cur.close()
-    conn.close()
-
-    return jsonify({
-        "draw": draw,
-        "recordsTotal": records_total,
-        "recordsFiltered": records_filtered,
-        "data": data
-    })
-
-
 
 
 @app.route('/listar_qr_obra', methods=['GET'])
@@ -656,7 +399,7 @@ def atualizar_relatorio_mv():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("REFRESH MATERIALIZED VIEW relatorio_atendimento_carga_embarque_mv;")  # 🔄 sem CONCURRENTLY
+        cur.execute("REFRESH MATERIALIZED VIEW relatorio_atendimento_carga_mv;")  # 🔄 sem CONCURRENTLY
         conn.commit()
         cur.close()
         conn.close()
@@ -676,7 +419,7 @@ def relatorio_diferencas():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        query = "SELECT * FROM relatorio_atendimento_carga_embarque_mv WHERE 1=1"
+        query = "SELECT * FROM relatorio_atendimento_carga_mv WHERE 1=1"
         parametros = []
 
         if obra:
@@ -688,23 +431,14 @@ def relatorio_diferencas():
             parametros.append(cargas)
 
         cur.execute(query, tuple(parametros))
-        resultados = cur.fetchall()
+        resultado = cur.fetchall()
 
-        # 🔽 aqui você usa os índices conforme a ordem da sua materialized view
-        data = [{
-            "cod_insumo": r[0],
-            "produto": r[1],
-            "obra": r[2],
-            "cargas": r[3],
-            "total_necessario": r[4],
-            "bipado_fabrica": r[5],
-            "bipado_embarque": r[6],  # ✅ novo campo
-            "bipado_obra": r[7]
-        } for r in resultados]
+        colunas = [desc[0] for desc in cur.description]
+        dados_json = [dict(zip(colunas, linha)) for linha in resultado]
 
         cur.close()
         conn.close()
-        return jsonify(data)
+        return jsonify(dados_json)
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
@@ -717,20 +451,6 @@ def excluir_qr_obra(id):
     cur = conn.cursor()
     try:
         cur.execute("DELETE FROM recebimento_obra WHERE id = %s", (id,))
-        conn.commit()
-        return jsonify({"sucesso": True})
-    except Exception as e:
-        return jsonify({"sucesso": False, "erro": str(e)})
-    finally:
-        cur.close()
-        conn.close()
-
-@app.route('/excluir_qr_embarque/<int:id>', methods=['DELETE'])
-def excluir_qr_embarque(id):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("DELETE FROM registros_qr_embarque WHERE id = %s", (id,))
         conn.commit()
         return jsonify({"sucesso": True})
     except Exception as e:
@@ -802,7 +522,7 @@ def atualizar_view():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_embarque_mv;')
+        cur.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_mv;')
         conn.commit()
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -840,296 +560,6 @@ def obras_disponiveis():
     finally:
         cur.close()
         conn.close()
-
-
-@app.route('/obras_disponiveis_maquinas')
-def obras_disponiveis_maquinas():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT DISTINCT obra FROM registro_produtividade WHERE obra IS NOT NULL ORDER BY obra")
-        resultados = cur.fetchall()
-        obras = [{"obra": r[0]} for r in resultados if r[0]]
-        return jsonify(obras)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-
-@app.route('/obras_filtradas_por_material')
-def obras_filtradas_por_material():
-    material = request.args.get("material")
-    data_inicio = request.args.get("data_inicio")
-    data_fim = request.args.get("data_fim")
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    query = """
-        SELECT DISTINCT obra FROM registro_produtividade
-        WHERE 1=1
-    """
-    params = []
-
-    if material:
-        query += " AND material = %s"
-        params.append(material)
-    if data_inicio:
-        query += " AND data >= %s"
-        params.append(data_inicio)
-    if data_fim:
-        query += " AND data <= %s"
-        params.append(data_fim)
-
-    cur.execute(query, tuple(params))
-    obras = [r[0] for r in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return jsonify(obras)
-
-
-@app.route('/materiais_filtrados_por_obra')
-def materiais_filtrados_por_obra():
-    obra = request.args.get("obra")
-    data_inicio = request.args.get("data_inicio")
-    data_fim = request.args.get("data_fim")
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    query = """
-        SELECT DISTINCT material FROM registro_produtividade
-        WHERE 1=1
-    """
-    params = []
-
-    if obra:
-        query += " AND obra = %s"
-        params.append(obra)
-    if data_inicio:
-        query += " AND data >= %s"
-        params.append(data_inicio)
-    if data_fim:
-        query += " AND data <= %s"
-        params.append(data_fim)
-
-    cur.execute(query, tuple(params))
-    materiais = [r[0] for r in cur.fetchall()]
-    cur.close()
-    conn.close()
-    return jsonify(materiais)
-
-
-@app.route('/obras_disponiveis_produtividade')
-def obras_disponiveis_produtividade():
-    data_inicio = request.args.get("data_inicio")
-    data_fim = request.args.get("data_fim")
-    maquina = request.args.get("maquina")  # ✅ novo
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        query = """
-            SELECT DISTINCT obra
-            FROM registro_produtividade
-            WHERE qtd_ch > 0
-        """
-        params = []
-
-        if data_inicio:
-            query += " AND data >= %s"
-            params.append(data_inicio)
-        if data_fim:
-            query += " AND data <= %s"
-            params.append(data_fim)
-        if maquina and maquina != "Todos":
-            query += " AND maquina = %s"
-            params.append(maquina)
-
-        query += " ORDER BY obra"
-
-        cur.execute(query, tuple(params))
-        obras = [r[0] for r in cur.fetchall()]
-        return jsonify(obras)
-
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-
-
-
-
-@app.route('/materiais_disponiveis')
-def materiais_disponiveis():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT DISTINCT material FROM registro_produtividade WHERE material IS NOT NULL ORDER BY material")
-        materiais = [row[0] for row in cur.fetchall()]
-        return jsonify(materiais)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-@app.route('/materiais_disponiveis_produtividade')
-def materiais_disponiveis_produtividade():
-    data_inicio = request.args.get("data_inicio")
-    data_fim = request.args.get("data_fim")
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    try:
-        query = "SELECT DISTINCT material FROM registro_produtividade WHERE material IS NOT NULL"
-        valores = []
-
-        if data_inicio:
-            query += " AND data >= %s"
-            valores.append(data_inicio)
-        if data_fim:
-            query += " AND data <= %s"
-            valores.append(data_fim)
-
-        query += " ORDER BY material"
-
-        cur.execute(query, tuple(valores))
-        resultados = cur.fetchall()
-        materiais = [r[0] for r in resultados]
-        return jsonify(materiais)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
-@app.route('/dados_relatorio_produtividade', methods=['POST'])
-def dados_relatorio_produtividade():
-    dados = request.json
-    obra = dados.get('obra')
-    data_inicio = dados.get('data_inicio')
-    data_fim = dados.get('data_fim')
-    operacao = dados.get('operacao')
-    material = dados.get('material')
-    maquina = dados.get('maquina')  # ⬅️ novo
-
-
-    filtros = []
-    valores = []
-
-    if obra and "Todos" not in obra:
-        filtros.append("obra = ANY(%s)")
-        valores.append(obra if isinstance(obra, list) else [obra])
-    if data_inicio:
-        filtros.append("data >= %s")
-        valores.append(data_inicio)
-    if data_fim:
-        filtros.append("data <= %s")
-        valores.append(data_fim)
-    if operacao:
-        filtros.append("operacao = %s")
-        valores.append(operacao)
-    if material:
-        filtros.append("material = %s")
-        valores.append(material)
-    if maquina:
-        filtros.append("maquina = %s")
-        valores.append(maquina)
-
-    where_clause = "WHERE " + " AND ".join(filtros) if filtros else ""
-
-    query_total = f"""
-        SELECT
-            COALESCE(SUM(CAST(qtd_ch AS INTEGER)), 0) as qtd_ch,
-            COALESCE(SUM(EXTRACT(EPOCH FROM (hr_fim - hr_inicio)) / 60), 0) as minutos_totais
-        FROM registro_produtividade
-        {where_clause}
-    """
-
-    query_paradas = f"""
-        SELECT ocorrencia, SUM(EXTRACT(EPOCH FROM (hr_fim - hr_inicio)) / 60) as minutos
-        FROM registro_produtividade
-        WHERE operacao = 'Ocorrência'
-        {"AND " + " AND ".join(filtros) if filtros else ""}
-        GROUP BY ocorrencia
-        ORDER BY minutos DESC
-    """
-
-    query_producao = f"""
-        SELECT data, SUM(CAST(qtd_ch AS INTEGER)) as qtd
-        FROM registro_produtividade
-        WHERE operacao IN ('Plano', 'Reposição', 'Assistência', 'Teste')
-        {"AND " + " AND ".join(filtros) if filtros else ""}
-        GROUP BY data
-        ORDER BY data
-    """
-
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        cur.execute(query_total, tuple(valores))
-        qtd_ch, minutos_totais = cur.fetchone()
-        minutos_totais = minutos_totais or 0
-
-        cur.execute(query_paradas, tuple(valores))
-        paradas = [{"ocorrencia": r[0], "minutos": int(r[1])} for r in cur.fetchall()]
-        soma_paradas = sum(p["minutos"] for p in paradas)
-
-        cur.execute(query_producao, tuple(valores))
-        producao = [{"data": r[0].strftime("%d/%m"), "qtd": int(r[1])} for r in cur.fetchall()]
-
-        cur.close()
-        conn.close()
-
-        return jsonify({
-            "qtd_ch": int(qtd_ch),
-            "horas_disp": int(minutos_totais),
-            "horas_trab": max(int(minutos_totais - soma_paradas), 0),
-            "horas_parada": soma_paradas,
-            "paradas": paradas,
-            "producao": producao,
-            "sucesso": True
-        })
-    except Exception as e:
-        return jsonify({"sucesso": False, "erro": str(e)})
-
-
-
-
-@app.route('/materiais_por_obra')
-def materiais_por_obra():
-    obras = request.args.getlist("obras[]")
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        query = """
-            SELECT DISTINCT material
-            FROM registro_produtividade
-            WHERE obra = ANY(%s)
-            ORDER BY material
-        """
-        cur.execute(query, (obras,))
-        resultados = cur.fetchall()
-        materiais = [r[0] for r in resultados if r[0]]
-        return jsonify(materiais)
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-
 
 @app.route('/cargas_disponiveis')
 def cargas_disponiveis():
@@ -1215,91 +645,6 @@ def relatorio_diferencas_interno(obra_filtro, carga_filtro):
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
 
-@app.route('/listar_registros_produtividade', methods=['GET'])
-def listar_registros_produtividade():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    try:
-        maquina = request.args.get("maquina")
-        valores = []
-        where_clause = ""
-
-        if maquina:
-            where_clause = "WHERE maquina = %s"
-            valores.append(maquina)
-
-        cur.execute(f"""
-            SELECT id, operacao, obra, qtd_ch, hr_inicio, hr_fim, operador, maquina, data, ocorrencia
-            FROM registro_produtividade
-            {where_clause}
-            ORDER BY id DESC
-        """, tuple(valores))
-
-        registros = cur.fetchall()
-
-        dados = []
-        for r in registros:
-            dados.append({
-                "id": r[0],
-                "operacao": r[1],
-                "obra": r[2],
-                "qtd_ch": r[3],
-                "hr_inicio": r[4].strftime("%H:%M") if r[4] else "",
-                "hr_fim": r[5].strftime("%H:%M") if r[5] else "",
-                "operador": r[6],
-                "maquina": r[7],
-                "data": r[8].strftime("%d/%m/%Y") if r[8] else "",
-                "ocorrencia": r[9] or ""
-            })
-
-        return jsonify({"data": dados})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
-
-@app.route('/materiais_por_maquina')
-def materiais_por_maquina():
-    maquina = request.args.get("maquina")
-    data_inicio = request.args.get("data_inicio")
-    data_fim = request.args.get("data_fim")
-    obras = request.args.getlist("obras[]")
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    query = """
-        SELECT DISTINCT material
-        FROM registro_produtividade
-        WHERE material IS NOT NULL
-    """
-    params = []
-
-    if maquina:
-        query += " AND maquina = %s"
-        params.append(maquina)
-    if obras:
-        query += " AND obra = ANY(%s)"
-        params.append(obras)
-    if data_inicio:
-        query += " AND data >= %s"
-        params.append(data_inicio)
-    if data_fim:
-        query += " AND data <= %s"
-        params.append(data_fim)
-
-    query += " ORDER BY material"
-
-    cur.execute(query, tuple(params))
-    materiais = [row[0] for row in cur.fetchall()]
-
-    cur.close()
-    conn.close()
-
-    return jsonify(materiais)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
-
