@@ -20,7 +20,6 @@ DATABASE_URL = "postgresql://neondb_owner:npg_lJHgpoh53QXM@ep-old-night-acgy3449
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL)
 
-
 @app.route('/')
 def index():
     return send_file('index.html')
@@ -216,12 +215,6 @@ def registrar_produtividade():
     operador = data.get("operador")  # ID ou nome, depende de como está no HTML
     material = data.get("material")
     maquina = data.get("maquina")
-    
-    try:
-        pecas_cortadas = int(data.get("pecas_cortadas")) if data.get("pecas_cortadas") not in ("", None) else 0
-    except ValueError:
-        pecas_cortadas = 0
-
 
     try:
         qtd_ch = int(data.get("qtd_ch")) if data.get("qtd_ch") not in ("", None) else 0
@@ -244,11 +237,11 @@ def registrar_produtividade():
         cur.execute("""
             INSERT INTO registro_produtividade (
                 operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
-                data, operador, material, horas_disponivel, maquina, pecas_cortadas
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                data, operador, material, horas_disponivel, maquina
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             operacao, obra, ocorrencia, hr_inicio, hr_fim,
-            qtd_ch, data_registro, operador, material, horas_disponivel, maquina, pecas_cortadas
+            qtd_ch, data_registro, operador, material, horas_disponivel, maquina
         ))
 
         conn.commit()
@@ -1279,8 +1272,7 @@ def listar_registros_produtividade():
             valores.append(maquina)
 
         cur.execute(f"""
-            SELECT id, operacao, obra, qtd_ch, pecas_cortadas, hr_inicio, hr_fim,
-                   operador, maquina, data, ocorrencia, material
+            SELECT id, operacao, obra, qtd_ch, hr_inicio, hr_fim, operador, maquina, data, ocorrencia
             FROM registro_produtividade
             {where_clause}
             ORDER BY id DESC
@@ -1295,14 +1287,12 @@ def listar_registros_produtividade():
                 "operacao": r[1],
                 "obra": r[2],
                 "qtd_ch": r[3],
-                "pecas_cortadas": r[4],
-                "hr_inicio": r[5].strftime("%H:%M") if r[5] else "",
-                "hr_fim": r[6].strftime("%H:%M") if r[6] else "",
-                "operador": r[7],
-                "maquina": r[8],
-                "data": r[9].strftime("%d/%m/%Y") if r[9] else "",
-                "ocorrencia": r[10] or "",
-                "material": r[11] or ""
+                "hr_inicio": r[4].strftime("%H:%M") if r[4] else "",
+                "hr_fim": r[5].strftime("%H:%M") if r[5] else "",
+                "operador": r[6],
+                "maquina": r[7],
+                "data": r[8].strftime("%d/%m/%Y") if r[8] else "",
+                "ocorrencia": r[9] or ""
             })
 
         return jsonify({"data": dados})
@@ -1312,12 +1302,15 @@ def listar_registros_produtividade():
         cur.close()
         conn.close()
 
+
+from flask import jsonify
+
 @app.route("/obter_registro/<int:id>")
 def obter_registro(id):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT id, operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch, pecas_cortadas, data, operador, material, maquina
+        SELECT id, operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch, data, operador, material, maquina
         FROM registro_produtividade
         WHERE id = %s
     """, (id,))
@@ -1328,6 +1321,7 @@ def obter_registro(id):
     if not row:
         return jsonify({"erro": "Registro não encontrado"}), 404
 
+    # Converte os campos de tempo e data para string
     resultado = {
         "id": row[0],
         "operacao": row[1],
@@ -1336,11 +1330,10 @@ def obter_registro(id):
         "hr_inicio": row[4].strftime('%H:%M') if row[4] else "",
         "hr_fim": row[5].strftime('%H:%M') if row[5] else "",
         "qtd_ch": row[6],
-        "pecas_cortadas": row[7],  # ✅ Aqui!
-        "data": row[8].strftime('%Y-%m-%d') if row[8] else "",
-        "operador": row[9],
-        "material": row[10],
-        "maquina": row[11]
+        "data": row[7].strftime('%Y-%m-%d') if row[7] else "",
+        "operador": row[8],
+        "material": row[9],
+        "maquina": row[10]
     }
 
     return jsonify(resultado)
