@@ -114,6 +114,11 @@
       <label for="qtd_ch">Qtd Ch</label>
       <input type="number" id="qtd_ch" required>
     </div>
+<div class="form-group">
+  <label for="pecas_cortadas">Qtd Peças</label>
+  <input type="number" id="pecas_cortadas" min="0">
+</div>
+
     <div class="form-group">
       <label for="maquina">Máquina</label>
       <select id="maquina" required>
@@ -154,12 +159,14 @@
     <th>Operação</th>
     <th>Obra</th>
     <th>Qtd Ch</th>
+    <th>Qtd Peças</th>
     <th>Hr Início</th>
     <th>Hr Final</th>
     <th>Operador</th>
     <th>Máquina</th>
     <th>Data</th>
     <th>Ocorrência</th>
+    <th>Material</th> <!-- nova coluna -->
     <th>Ação</th> <!-- nova coluna -->
   </tr>
 </thead>
@@ -231,6 +238,7 @@
   const obraSelect = document.getElementById('obra');
   const materialSelect = document.getElementById('material');
   const qtdChInput = document.getElementById('qtd_ch');
+  const pecasCortadasInput = document.getElementById('pecas_cortadas');
 
   function atualizarRegras() {
     const operacao = operacaoSelect.value;
@@ -243,10 +251,13 @@
     obraSelect.disabled = isOcorrencia;
     materialSelect.disabled = isOcorrencia;
     qtdChInput.disabled = isOcorrencia;
+    pecasCortadasInput.disabled = isOcorrencia;
+
     if (isOcorrencia) {
       obraSelect.value = "";
       materialSelect.value = "";
       qtdChInput.value = "";
+      pecasCortadasInput.value = "";
     }
   }
 
@@ -265,6 +276,7 @@
     const hr_inicio = document.getElementById("hr_inicio").value;
     const hr_fim = document.getElementById("hr_fim").value;
     const qtd_ch = qtdChInput.value;
+    const pecas_cortadas = pecasCortadasInput.value;
     const data = document.getElementById("data").value;
     const operador = document.getElementById("operador").value;
     const material = materialSelect.value;
@@ -296,7 +308,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
-        data, operador, material, maquina
+        data, operador, material, maquina, pecas_cortadas
       })
     })
     .then(res => res.json())
@@ -307,6 +319,7 @@
         obraSelect.value = "";
         ocorrenciaSelect.value = "";
         qtdChInput.value = "";
+        pecasCortadasInput.value = "";
         materialSelect.value = "";
         document.getElementById("hr_inicio").value = hr_fim;
         document.getElementById("hr_fim").value = "";
@@ -338,12 +351,14 @@
         { data: "operacao" },
         { data: "obra" },
         { data: "qtd_ch" },
+        { data: "pecas_cortadas" },
         { data: "hr_inicio" },
         { data: "hr_fim" },
         { data: "operador" },
         { data: "maquina" },
         { data: "data" },
         { data: "ocorrencia" },
+        { data: "material" },
         {
           data: null,
           render: function (data, type, row) {
@@ -377,6 +392,7 @@
         document.getElementById("hr_inicio").value = dados.hr_inicio;
         document.getElementById("hr_fim").value = dados.hr_fim;
         document.getElementById("qtd_ch").value = dados.qtd_ch;
+        document.getElementById("pecas_cortadas").value = dados.pecas_cortadas || 0;
         document.getElementById("data").value = dados.data;
         document.getElementById("operador").value = dados.operador;
         document.getElementById("material").value = dados.material;
@@ -408,6 +424,7 @@
     });
   }
 </script>
+
 
 
 </body>
