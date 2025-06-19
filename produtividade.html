@@ -114,6 +114,11 @@
       <label for="qtd_ch">Qtd Ch</label>
       <input type="number" id="qtd_ch" required>
     </div>
+<div class="form-group">
+  <label for="pecas_cortadas">Qtd Peças</label>
+  <input type="number" id="pecas_cortadas" min="0">
+</div>
+
     <div class="form-group">
       <label for="maquina">Máquina</label>
       <select id="maquina" required>
@@ -154,12 +159,14 @@
     <th>Operação</th>
     <th>Obra</th>
     <th>Qtd Ch</th>
+    <th>Qtd Peças</th>
     <th>Hr Início</th>
     <th>Hr Final</th>
     <th>Operador</th>
     <th>Máquina</th>
     <th>Data</th>
     <th>Ocorrência</th>
+    <th>Material</th> <!-- nova coluna -->
     <th>Ação</th> <!-- nova coluna -->
   </tr>
 </thead>
@@ -232,23 +239,26 @@
   const materialSelect = document.getElementById('material');
   const qtdChInput = document.getElementById('qtd_ch');
 
-  function atualizarRegras() {
-    const operacao = operacaoSelect.value;
-    const isAssistenciaOuPlano = ["Assistência", "Plano", "Reposição", "Teste"].includes(operacao);
-    const isOcorrencia = operacao === "Ocorrência";
+function atualizarRegras() {
+  const operacao = operacaoSelect.value;
+  const isAssistenciaOuPlano = ["Assistência", "Plano", "Reposição", "Teste"].includes(operacao);
+  const isOcorrencia = operacao === "Ocorrência";
 
-    ocorrenciaSelect.disabled = isAssistenciaOuPlano;
-    if (isAssistenciaOuPlano) ocorrenciaSelect.value = "";
+  ocorrenciaSelect.disabled = isAssistenciaOuPlano;
+  if (isAssistenciaOuPlano) ocorrenciaSelect.value = "";
 
-    obraSelect.disabled = isOcorrencia;
-    materialSelect.disabled = isOcorrencia;
-    qtdChInput.disabled = isOcorrencia;
-    if (isOcorrencia) {
-      obraSelect.value = "";
-      materialSelect.value = "";
-      qtdChInput.value = "";
-    }
+  obraSelect.disabled = isOcorrencia;
+  materialSelect.disabled = isOcorrencia;
+  qtdChInput.disabled = isOcorrencia;
+  document.getElementById("pecas_cortadas").disabled = isOcorrencia; // ✅ Aqui
+
+  if (isOcorrencia) {
+    obraSelect.value = "";
+    materialSelect.value = "";
+    qtdChInput.value = "";
+    document.getElementById("pecas_cortadas").value = ""; // ✅ Limpa também
   }
+}
 
   operacaoSelect.addEventListener('change', atualizarRegras);
   window.addEventListener('DOMContentLoaded', () => {
@@ -269,6 +279,8 @@
     const operador = document.getElementById("operador").value;
     const material = materialSelect.value;
     const maquina = document.getElementById("maquina").value;
+    const pecas_cortadas = document.getElementById("pecas_cortadas").value;
+
 
     if (!operacao || !hr_inicio || !hr_fim || !data || !operador) {
       alert("Preencha todos os campos obrigatórios.");
@@ -296,7 +308,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
-        data, operador, material, maquina
+        data, operador, material, maquina, pecas_cortadas
       })
     })
     .then(res => res.json())
@@ -338,12 +350,14 @@
         { data: "operacao" },
         { data: "obra" },
         { data: "qtd_ch" },
+        { data: "pecas_cortadas" },
         { data: "hr_inicio" },
         { data: "hr_fim" },
         { data: "operador" },
         { data: "maquina" },
         { data: "data" },
         { data: "ocorrencia" },
+        { data: "material" },
         {
           data: null,
           render: function (data, type, row) {
@@ -381,6 +395,7 @@
         document.getElementById("operador").value = dados.operador;
         document.getElementById("material").value = dados.material;
         document.getElementById("maquina").value = dados.maquina;
+        document.getElementById("pecas_cortadas").value = dados.pecas_cortadas || 0;
 
         document.getElementById("produtividadeForm").setAttribute("data-edicao-id", id);
         atualizarRegras();
