@@ -976,7 +976,8 @@ def materiais_filtrados_por_obra():
 def obras_disponiveis_produtividade():
     data_inicio = request.args.get("data_inicio")
     data_fim = request.args.get("data_fim")
-    maquina = request.args.get("maquina")  # ✅ novo
+    maquina = request.args.get("maquina")
+    material = request.args.get("material")
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -984,7 +985,7 @@ def obras_disponiveis_produtividade():
         query = """
             SELECT DISTINCT obra
             FROM registro_produtividade
-            WHERE qtd_ch > 0
+            WHERE (COALESCE(qtd_ch, 0) > 0 OR COALESCE(pecas_cortadas, 0) > 0)
         """
         params = []
 
@@ -997,6 +998,9 @@ def obras_disponiveis_produtividade():
         if maquina and maquina != "Todos":
             query += " AND maquina = %s"
             params.append(maquina)
+        if material and material != "Todos":
+            query += " AND material = %s"
+            params.append(material)
 
         query += " ORDER BY obra"
 
@@ -1009,8 +1013,6 @@ def obras_disponiveis_produtividade():
     finally:
         cur.close()
         conn.close()
-
-
 
 
 
@@ -1070,8 +1072,7 @@ def dados_relatorio_produtividade():
     data_fim = dados.get('data_fim')
     operacao = dados.get('operacao')
     material = dados.get('material')
-    maquina = dados.get('maquina')  # ⬅️ novo
-
+    maquina = dados.get('maquina')
 
     filtros = []
     valores = []
@@ -1100,7 +1101,8 @@ def dados_relatorio_produtividade():
     query_total = f"""
         SELECT
             COALESCE(SUM(CAST(qtd_ch AS INTEGER)), 0) as qtd_ch,
-            COALESCE(SUM(EXTRACT(EPOCH FROM (hr_fim - hr_inicio)) / 60), 0) as minutos_totais
+            COALESCE(SUM(EXTRACT(EPOCH FROM (hr_fim - hr_inicio)) / 60), 0) as minutos_totais,
+            COALESCE(SUM(CAST(pecas_cortadas AS INTEGER)), 0) as qtd_pecas
         FROM registro_produtividade
         {where_clause}
     """
@@ -1128,7 +1130,7 @@ def dados_relatorio_produtividade():
         cur = conn.cursor()
 
         cur.execute(query_total, tuple(valores))
-        qtd_ch, minutos_totais = cur.fetchone()
+        qtd_ch, minutos_totais, qtd_pecas = cur.fetchone()
         minutos_totais = minutos_totais or 0
 
         cur.execute(query_paradas, tuple(valores))
@@ -1143,6 +1145,7 @@ def dados_relatorio_produtividade():
 
         return jsonify({
             "qtd_ch": int(qtd_ch),
+            "qtd_pecas": int(qtd_pecas),
             "horas_disp": int(minutos_totais),
             "horas_trab": max(int(minutos_totais - soma_paradas), 0),
             "horas_parada": soma_paradas,
@@ -1152,8 +1155,6 @@ def dados_relatorio_produtividade():
         })
     except Exception as e:
         return jsonify({"sucesso": False, "erro": str(e)})
-
-
 
 
 @app.route('/materiais_por_obra')
