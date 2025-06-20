@@ -118,10 +118,12 @@
 
 <div class="dashboard">
   <div class="card"><h3>Qtd Ch Cortadas</h3><div id="qtd_ch">--</div></div>
+  <div class="card"><h3>Qtd Peças Cortadas</h3><div id="qtd_pecas">--</div></div> <!-- ✅ Novo card -->
   <div class="card"><h3>Qtd Horas Disponível</h3><div id="horas_disp">--</div></div>
   <div class="card"><h3>Qtd Horas Trabalhadas</h3><div id="horas_trab">--</div></div>
   <div class="card"><h3>Qtd Horas Parada</h3><div id="horas_parada">--</div></div>
 </div>
+
 
 <br><br>
 
@@ -158,17 +160,20 @@ function formatarTempo(minutos) {
 function carregarFiltros() {
   carregarObras();
   carregarMateriais();
+  carregarMaquinas();
 }
 
 function carregarObras() {
   const dataInicio = document.getElementById("data_inicio").value;
   const dataFim = document.getElementById("data_fim").value;
   const maquina = document.getElementById("filtro_maquina").value;
+  const material = document.getElementById("filtro_material").value;
 
   let url = `/obras_disponiveis_produtividade?`;
   if (dataInicio) url += `data_inicio=${dataInicio}&`;
   if (dataFim) url += `data_fim=${dataFim}&`;
-  if (maquina) url += `maquina=${maquina}`;
+  if (maquina && maquina !== "Todos") url += `maquina=${maquina}&`;
+  if (material && material !== "Todos") url += `material=${encodeURIComponent(material)}`;
 
   fetch(url)
     .then(res => res.json())
@@ -205,12 +210,6 @@ function carregarMaquinas() {
         select.appendChild(option);
       });
     });
-}
-
-function carregarFiltros() {
-  carregarObras();
-  carregarMateriais();
-  carregarMaquinas();  // ⬅ aqui!
 }
 
 function carregarMateriais() {
@@ -257,6 +256,7 @@ function atualizarRelatorio() {
     .then(res => res.json())
     .then(dados => {
       document.getElementById("qtd_ch").textContent = dados.qtd_ch;
+      document.getElementById("qtd_pecas").textContent = dados.qtd_pecas; // ✅ Novo campo
       document.getElementById("horas_disp").textContent = formatarTempo(dados.horas_disp || 0);
       document.getElementById("horas_parada").textContent = formatarTempo(dados.horas_parada || 0);
       document.getElementById("horas_trab").textContent = formatarTempo(dados.horas_trab || 0);
@@ -319,12 +319,11 @@ window.onload = () => {
   carregarFiltros();
   atualizarRelatorio();
 
-document.getElementById("filtro_maquina").addEventListener("change", () => {
-  carregarObras();
-  carregarMateriais();
-  atualizarRelatorio();
-});
-
+  document.getElementById("filtro_maquina").addEventListener("change", () => {
+    carregarObras();
+    carregarMateriais();
+    atualizarRelatorio();
+  });
 
   document.getElementById("data_inicio").addEventListener("change", () => {
     carregarObras();
@@ -343,17 +342,16 @@ document.getElementById("filtro_maquina").addEventListener("change", () => {
     atualizarRelatorio();
   });
 
-
   document.getElementById("filtro_material").addEventListener("change", () => {
-    carregarObras();      // atualiza as obras que usam esse material
-    atualizarRelatorio(); // atualiza os dados
+    carregarObras();
+    atualizarRelatorio();
   });
-
 
   document.querySelectorAll(".filters select, .filters input").forEach(el => {
     el.addEventListener("change", atualizarRelatorio);
   });
 };
 </script>
+
 </body>
 </html>
