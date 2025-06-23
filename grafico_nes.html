@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+
   <meta charset="UTF-8">
   <title>Relatório de Produtividade</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -35,8 +39,40 @@
     canvas {
       background-color: #eee;
       border-radius: 15px;
-      padding: 10px;
+      display: block;
     }
+
+canvas {
+  background-color: #eee;
+  border-radius: 15px;
+  display: block;
+  max-height: 300px;
+  width: 100% !important;
+}
+
+
+#grafico_producao {
+  width: 100% !important;
+  height: 300px !important;
+  max-height: 300px;
+}
+
+
+#grafico-parada-card {
+  height: 360px;
+  max-height: 360px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+#grafico_parada {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+
 
     .filters {
       margin-bottom: 30px;
@@ -89,6 +125,7 @@
     <label>Data Fim:</label>
     <input type="date" id="data_fim">
   </div>
+
   <div>
     <label>Tipo Corte:</label>
     <select id="filtro_operacao">
@@ -128,16 +165,20 @@
 <br><br>
 
 <div class="dashboard">
-  <div class="card" style="grid-column: span 2;">
-    <h3>Parada de Produção</h3>
-    <canvas id="grafico_parada" height="150"></canvas>
-  </div>
-  <div class="card" style="grid-column: span 2;">
-    <h3>Produção</h3>
-    <canvas id="grafico_producao" height="150"></canvas>
-  </div>
+<div class="card" id="grafico-parada-card" style="grid-column: span 2;">
+  <h3>Parada de Produção</h3>
+  <canvas id="grafico_parada"></canvas>
 </div>
 
+<div class="card" style="grid-column: span 2;">
+  <h3>Produção</h3>
+  <canvas id="grafico_producao"></canvas>
+</div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
 <script>
 function limparFiltros() {
   document.getElementById("filtro_obra").selectedIndex = -1;
@@ -212,6 +253,7 @@ function carregarMaquinas() {
     });
 }
 
+
 function carregarMateriais() {
   const obrasSelecionadas = Array.from(document.getElementById("filtro_obra").selectedOptions).map(opt => opt.value);
   const dataInicio = document.getElementById("data_inicio").value;
@@ -256,7 +298,7 @@ function atualizarRelatorio() {
     .then(res => res.json())
     .then(dados => {
       document.getElementById("qtd_ch").textContent = dados.qtd_ch;
-      document.getElementById("qtd_pecas").textContent = dados.qtd_pecas; // ✅ Novo campo
+      document.getElementById("qtd_pecas").textContent = dados.qtd_pecas;
       document.getElementById("horas_disp").textContent = formatarTempo(dados.horas_disp || 0);
       document.getElementById("horas_parada").textContent = formatarTempo(dados.horas_parada || 0);
       document.getElementById("horas_trab").textContent = formatarTempo(dados.horas_trab || 0);
@@ -270,48 +312,119 @@ function atualizarRelatorio() {
 let chartParada, chartProducao;
 
 function atualizarGraficoParada(paradas) {
-  const ctx = document.getElementById("grafico_parada").getContext("2d");
+  const canvas = document.getElementById("grafico_parada");
+  const novoCanvas = canvas.cloneNode();
+  canvas.parentNode.replaceChild(novoCanvas, canvas);
+  const ctx = novoCanvas.getContext("2d");
+
   const labels = paradas.map(p => p.ocorrencia);
   const tempos = paradas.map(p => p.minutos);
 
-  if (chartParada) chartParada.destroy();
   chartParada = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
       datasets: [{
-        label: 'Tempo (min)',
         data: tempos,
-        backgroundColor: '#b71c1c'
+        backgroundColor: '#8B0000',
+        borderRadius: 6,
+        borderSkipped: false
       }]
     },
     options: {
+      indexAxis: 'x',
       responsive: true,
-      plugins: { legend: { display: false } }
-    }
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          anchor: 'center',
+          align: 'center',
+          color: '#fff',
+          font: { weight: 'bold', size: 14 },
+          rotation: -90,
+          formatter: value => formatarTempo(value)
+        },
+        tooltip: {
+          callbacks: {
+            label: context => {
+              const minutos = context.raw || 0;
+              return `Tempo: ${formatarTempo(minutos)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            maxRotation: 45,
+            minRotation: 45,
+            color: '#000',
+            font: { size: 11 }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          display: false
+        }
+      }
+    },
+    plugins: [ChartDataLabels]
   });
 }
 
 function atualizarGraficoProducao(producao) {
-  const ctx = document.getElementById("grafico_producao").getContext("2d");
+  const canvas = document.getElementById("grafico_producao");
+  const novoCanvas = canvas.cloneNode(true);
+  canvas.parentNode.replaceChild(novoCanvas, canvas);
+
+  const ctx = novoCanvas.getContext("2d");
+
   const labels = producao.map(p => p.data);
   const quantidades = producao.map(p => p.qtd);
 
-  if (chartProducao) chartProducao.destroy();
   chartProducao = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
       datasets: [{
-        label: 'Qtd Cortadas',
         data: quantidades,
-        backgroundColor: '#880e4f'
+        backgroundColor: '#8B0000',
+        borderRadius: 6,
+        borderSkipped: false
       }]
     },
     options: {
+      indexAxis: 'x',
       responsive: true,
-      plugins: { legend: { display: false } }
-    }
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          anchor: 'center',
+          align: 'center',
+          color: '#fff',
+          font: { weight: 'bold', size: 14 },
+          formatter: value => value.toString(),
+          rotation: -90
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            maxRotation: 45,
+            minRotation: 45,
+            color: '#000',
+            font: { size: 11 }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          display: false
+        }
+      }
+    },
+    plugins: [ChartDataLabels]
   });
 }
 
@@ -351,6 +464,7 @@ window.onload = () => {
     el.addEventListener("change", atualizarRelatorio);
   });
 };
+
 </script>
 
 </body>
