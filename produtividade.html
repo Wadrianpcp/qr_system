@@ -99,7 +99,13 @@
       <label for="ocorrencia">Ocorrência</label>
       <select id="ocorrencia" required></select>
     </div>
+  <div class="form-group">
+    <label for="observacao">Obs:</label>
+    <input type="text" id="observacao" placeholder="Escreva aqui...">
   </div>
+
+</div>
+
 
   <div class="form-row">
     <div class="form-group">
@@ -153,24 +159,34 @@
 
 <h3 style="text-align: center;">Registros de Lançamento</h3>
 <table id="tabelaRegistros" class="display">
-<thead>
-  <tr>
-    <th>ID</th>
-    <th>Operação</th>
-    <th>Obra</th>
-    <th>Qtd Ch</th>
-    <th>Qtd Peças</th>
-    <th>Hr Início</th>
-    <th>Hr Final</th>
-    <th>Operador</th>
-    <th>Máquina</th>
-    <th>Data</th>
-    <th>Ocorrência</th>
-    <th>Material</th> <!-- nova coluna -->
-    <th>Ação</th> <!-- nova coluna -->
-  </tr>
-</thead>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Operação</th>
+      <th>Obra</th>
+      <th>Qtd Ch</th>
+      <th>Qtd Peças</th>
+      <th>Hr Início</th>
+      <th>Hr Final</th>
+      <th>Operador</th>
+      <th>Máquina</th>
+      <th>Data</th>
+      <th>Ocorrência</th>
+      <th>Material</th> <!-- nova coluna -->
+      <th>Ação</th> <!-- nova coluna -->
+    </tr>
+  </thead>
 </table>
+
+<!-- 🔽 Cole aqui o modal -->
+<div id="modalObs" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;">
+  <div style="background:white; padding:20px; border-radius:8px; max-width:400px; text-align:center;">
+    <h3>Observação</h3>
+    <p id="obsTexto" style="white-space:pre-wrap;"></p>
+    <button onclick="fecharObs()" style="margin-top:15px;">Fechar</button>
+  </div>
+</div>
+
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -239,6 +255,8 @@
   const materialSelect = document.getElementById('material');
   const qtdChInput = document.getElementById('qtd_ch');
   const pecasCortadasInput = document.getElementById('pecas_cortadas');
+  
+
 
   function atualizarRegras() {
     const operacao = operacaoSelect.value;
@@ -281,7 +299,7 @@
     const operador = document.getElementById("operador").value;
     const material = materialSelect.value;
     const maquina = document.getElementById("maquina").value;
-
+    const observacao = document.getElementById("observacao").value;
     if (!operacao || !hr_inicio || !hr_fim || !data || !operador) {
       alert("Preencha todos os campos obrigatórios.");
       return;
@@ -308,7 +326,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
-        data, operador, material, maquina, pecas_cortadas
+        data, operador, material, maquina, pecas_cortadas,observacao 
       })
     })
     .then(res => res.json())
@@ -321,6 +339,7 @@
         qtdChInput.value = "";
         pecasCortadasInput.value = "";
         materialSelect.value = "";
+        document.getElementById("observacao").value = "";
         document.getElementById("hr_inicio").value = hr_fim;
         document.getElementById("hr_fim").value = "";
         atualizarRegras();
@@ -365,6 +384,8 @@
             return `
               <button onclick="editarRegistro(${row.id})">Editar</button>
               <button onclick="excluirRegistro(${row.id})" style="margin-left:5px; background-color:#d32f2f; color:white;">Excluir</button>
+              <button onclick="verObs('${row.observacao || ''}')" title="Ver Observação" style="margin-left:5px; background-color:#444; color:white;">👁️</button>
+
             `;
           }
         }
@@ -397,6 +418,7 @@
         document.getElementById("operador").value = dados.operador;
         document.getElementById("material").value = dados.material;
         document.getElementById("maquina").value = dados.maquina;
+        document.getElementById("observacao").value = dados.observacao || "";
 
         document.getElementById("produtividadeForm").setAttribute("data-edicao-id", id);
         atualizarRegras();
@@ -423,6 +445,16 @@
       console.error(err);
     });
   }
+function verObs(obs) {
+  document.getElementById("obsTexto").textContent = obs || "(Sem observação)";
+  document.getElementById("modalObs").style.display = "flex";
+}
+
+function fecharObs() {
+  document.getElementById("modalObs").style.display = "none";
+}
+
+
 </script>
 
 
