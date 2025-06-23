@@ -213,15 +213,15 @@ def registrar_produtividade():
     hr_inicio = data.get("hr_inicio")
     hr_fim = data.get("hr_fim")
     data_registro = data.get("data")
-    operador = data.get("operador")  # ID ou nome, depende de como está no HTML
+    operador = data.get("operador")
     material = data.get("material")
     maquina = data.get("maquina")
-    
+    observacao = data.get("observacao")
+
     try:
         pecas_cortadas = int(data.get("pecas_cortadas")) if data.get("pecas_cortadas") not in ("", None) else 0
     except ValueError:
         pecas_cortadas = 0
-
 
     try:
         qtd_ch = int(data.get("qtd_ch")) if data.get("qtd_ch") not in ("", None) else 0
@@ -229,7 +229,6 @@ def registrar_produtividade():
         qtd_ch = 0
 
     try:
-        # Calcula duração da hora
         h_inicio = datetime.strptime(hr_inicio, "%H:%M")
         h_fim = datetime.strptime(hr_fim, "%H:%M")
         duracao = h_fim - h_inicio
@@ -244,11 +243,12 @@ def registrar_produtividade():
         cur.execute("""
             INSERT INTO registro_produtividade (
                 operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
-                data, operador, material, horas_disponivel, maquina, pecas_cortadas
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                data, operador, material, horas_disponivel, maquina, pecas_cortadas, observacao
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             operacao, obra, ocorrencia, hr_inicio, hr_fim,
-            qtd_ch, data_registro, operador, material, horas_disponivel, maquina, pecas_cortadas
+            qtd_ch, data_registro, operador, material,
+            horas_disponivel, maquina, pecas_cortadas, observacao
         ))
 
         conn.commit()
@@ -259,10 +259,6 @@ def registrar_produtividade():
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
-
-
-
-
 
 
 @app.route('/material')
@@ -1281,7 +1277,7 @@ def listar_registros_produtividade():
 
         cur.execute(f"""
             SELECT id, operacao, obra, qtd_ch, pecas_cortadas, hr_inicio, hr_fim,
-                   operador, maquina, data, ocorrencia, material
+                   operador, maquina, data, ocorrencia, material, observacao
             FROM registro_produtividade
             {where_clause}
             ORDER BY id DESC
@@ -1303,7 +1299,8 @@ def listar_registros_produtividade():
                 "maquina": r[8],
                 "data": r[9].strftime("%d/%m/%Y") if r[9] else "",
                 "ocorrencia": r[10] or "",
-                "material": r[11] or ""
+                "material": r[11] or "",
+                "observacao": r[12] or ""
             })
 
         return jsonify({"data": dados})
@@ -1313,12 +1310,14 @@ def listar_registros_produtividade():
         cur.close()
         conn.close()
 
+
 @app.route("/obter_registro/<int:id>")
 def obter_registro(id):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("""
-        SELECT id, operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch, pecas_cortadas, data, operador, material, maquina
+        SELECT id, operacao, obra, ocorrencia, hr_inicio, hr_fim,
+               qtd_ch, pecas_cortadas, data, operador, material, maquina, observacao
         FROM registro_produtividade
         WHERE id = %s
     """, (id,))
@@ -1337,14 +1336,16 @@ def obter_registro(id):
         "hr_inicio": row[4].strftime('%H:%M') if row[4] else "",
         "hr_fim": row[5].strftime('%H:%M') if row[5] else "",
         "qtd_ch": row[6],
-        "pecas_cortadas": row[7],  # ✅ Aqui!
+        "pecas_cortadas": row[7],
         "data": row[8].strftime('%Y-%m-%d') if row[8] else "",
         "operador": row[9],
         "material": row[10],
-        "maquina": row[11]
+        "maquina": row[11],
+        "observacao": row[12] or ""
     }
 
     return jsonify(resultado)
+
 
 @app.route('/atualizar_produtividade/<int:id>', methods=['PUT'])
 def atualizar_produtividade(id):
@@ -1359,7 +1360,7 @@ def atualizar_produtividade(id):
             SET operacao = %s, obra = %s, ocorrencia = %s,
                 hr_inicio = %s, hr_fim = %s, qtd_ch = %s,
                 data = %s, operador = %s, material = %s,
-                maquina = %s, pecas_cortadas = %s
+                maquina = %s, pecas_cortadas = %s, observacao = %s
             WHERE id = %s
         """, (
             data.get("operacao"),
@@ -1372,7 +1373,8 @@ def atualizar_produtividade(id):
             data.get("operador"),
             data.get("material"),
             data.get("maquina"),
-            int(data.get("pecas_cortadas") or 0),  # <- incluído aqui
+            int(data.get("pecas_cortadas") or 0),
+            data.get("observacao"),  # ✅ novo campo
             id
         ))
 
@@ -1383,6 +1385,7 @@ def atualizar_produtividade(id):
         return jsonify({"sucesso": True})
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
+
 
 @app.route("/excluir_registro/<int:id>", methods=["DELETE"])
 def excluir_registro(id):
