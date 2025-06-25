@@ -100,6 +100,7 @@
     height: 100vh;
     background-color: white;
     z-index: 9999;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -211,6 +212,8 @@
 
 
   <div id="autoUpdateControls">
+
+
    
 
 <div id="graficoModal" style="
@@ -225,7 +228,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow-y: auto
   padding: 0;
   margin: 0;
   box-sizing: border-box;
@@ -266,7 +269,9 @@
       <th>CARGAS</th>
       <th>TOTAL NECESSÁRIO</th>
       <th>BIPADO FABRICA</th>
+      <th>BIPADO EMBARQUE</th>
       <th>BIPADO OBRA</th>
+
     </tr>
   </thead>
   <tbody id="tabelaRelatorio">
@@ -277,9 +282,49 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
+<script>
 
-  <script>
+function exportarExcel() {
+  const tabela = $('#relatorioTable').DataTable();
+  const dadosFiltrados = tabela.rows({ search: 'applied' }).data().toArray();
+
+  if (dadosFiltrados.length === 0) {
+    alert("Nenhum dado para exportar.");
+    return;
+  }
+
+  const cabecalhos = Array.from(document.querySelectorAll('#relatorioTable thead th')).map(th => th.innerText);
+
+  const linhas = dadosFiltrados.map(row => row.map((valor, index) => {
+    // Colunas 4 até 7 (TOTAL NECESSÁRIO até BIPADO OBRA) são numéricas
+    if (index >= 4 && index <= 7) {
+      const num = parseInt(valor);
+      return isNaN(num) ? valor : num; // Garante número
+    }
+    return valor;
+  }));
+
+  const wsData = [cabecalhos, ...linhas];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Força o formato de número nas colunas específicas
+  for (let r = 1; r < wsData.length; r++) {
+    for (let c = 4; c <= 7; c++) {
+      const cellRef = XLSX.utils.encode_cell({ c: c, r: r });
+      if (ws[cellRef]) ws[cellRef].t = 'n';
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+
+  XLSX.writeFile(wb, "relatorio_carga_filtrado.xlsx");
+}
+
 
 function exibirGrafico(tipo) {
   const fabrica = document.getElementById('graficoFabricaContainer');
@@ -372,7 +417,7 @@ formatter: (value, context) => {
                 color: 'white',
                 font: {
                   weight: 'bold',
-                  size: 14
+                  size: 20
                 },
                 borderRadius: 4,
                 padding: 6
@@ -414,7 +459,7 @@ formatter: (value, context) => {
                 color: 'white',
                 font: {
                   weight: 'bold',
-                  size: 14
+                  size: 20
                 },
                 borderRadius: 4,
                 padding: 6
@@ -469,23 +514,52 @@ const cargasSelecionadas = Array.from(cargaSelect.selectedOptions).map(opt => op
       }, intervaloAtualizacao);
     }
 
-    function exportarPDF() {
-      const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
-      const agora = new Date().toLocaleString();
-      const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.text("Relatório de Atendimento da Carga", 14, 15);
-      const headers = [["COD INSUMO", "PRODUTO", "OBRA", "CARGAS", "TOTAL NECESSÁRIO", "BIPADO FABRICA", "BIPADO OBRA"]];
-      const body = [];
-      document.querySelectorAll("#tabelaRelatorio tr").forEach(row => {
-        const cells = Array.from(row.children).map(td => td.textContent.trim());
-        body.push(cells);
-      });
-      doc.autoTable({ head: headers, body: body, startY: 25, margin: { bottom: 20 }, styles: { fontSize: 8 } });
-      doc.text(rodape, 14, doc.internal.pageSize.height - 10);
-      doc.save("relatorio_carga.pdf");
-    }
+function exportarPDF() {
+  const nomeUsuario = document.getElementById('nomeUsuario').value.trim();
+  const agora = new Date().toLocaleString();
+  const rodape = `Exportado por: ${nomeUsuario || 'Não informado'} | Data: ${agora}`;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+
+  doc.setFontSize(14);
+  doc.text("Relatório de Atendimento da Carga", 14, 15);
+
+  const tabela = $('#relatorioTable').DataTable();
+  const dados = tabela.rows({ search: 'applied' }).data().toArray();
+
+  if (dados.length === 0) {
+    alert("Nenhum dado para exportar.");
+    return;
+  }
+
+  // Cabeçalhos do relatório
+  const headers = [["COD INSUMO", "PRODUTO", "OBRA", "CARGAS", "TOTAL NECESSÁRIO", "BIPADO FABRICA", "BIPADO EMBARQUE", "BIPADO OBRA"]];
+
+  // Corpo da tabela (sem estilos de cor)
+  const body = dados.map(row =>
+    row.map((valor, i) => ({
+      content: (i >= 4 && i <= 7) ? parseInt(valor) || 0 : valor,
+      styles: {
+        halign: (i >= 4 && i <= 7) ? 'right' : 'left'
+      }
+    }))
+  );
+
+  doc.autoTable({
+    head: headers,
+    body: body,
+    startY: 25,
+    margin: { bottom: 30 },
+    styles: { fontSize: 8 },
+    theme: 'grid',
+    headStyles: { fillColor: [23, 118, 210] }
+  });
+
+  doc.setFontSize(10);
+  doc.text(rodape, 14, doc.internal.pageSize.height - 10);
+
+  doc.save("relatorio_carga.pdf");
+}
 
     function preencherObras() {
       fetch('/obras_disponiveis')
@@ -533,7 +607,6 @@ function carregarRelatorioPorObraECarga(obra, cargas) {
 function renderizarTabela(data) {
   document.getElementById('mensagemInicial').style.display = 'none';
 
-  // 🔁 Destroi a DataTable anterior, se existir
   if ($.fn.dataTable.isDataTable('#relatorioTable')) {
     $('#relatorioTable').DataTable().clear().destroy();
   }
@@ -547,22 +620,30 @@ function renderizarTabela(data) {
   }
 
   const filtroCodInsumo = document.getElementById('filtroCodInsumo').value.toLowerCase();
-
-const filtroProduto = document.getElementById('filtroProduto').value.toLowerCase();
-
+  const filtroProduto = document.getElementById('filtroProduto').value.toLowerCase();
   const filtroCargasSelecionadas = Array.from(document.getElementById('filtroCargas').selectedOptions).map(opt => opt.value);
   const filtroStatus = document.getElementById('filtroStatus').value;
 
   let totalCarga = 0, totalBipadoFabrica = 0, totalBipadoObra = 0;
 
   const filtrado = data.filter(item => {
-    let status = item.bipado_fabrica > 0 && item.bipado_obra > 0 ? 'verde' :
-                 item.bipado_fabrica > 0 ? 'amarelo' : 'vermelho';
-return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo)) &&
-       (!filtroProduto || item.produto.toLowerCase().includes(filtroProduto)) &&
-       (!filtroCargasSelecionadas.length || filtroCargasSelecionadas.includes(item.cargas)) &&
-       (!filtroStatus || status === filtroStatus);
+    const total = parseInt(item.total_necessario);
+    const fab = parseInt(item.bipado_fabrica);
+    const obra = parseInt(item.bipado_obra);
 
+    let status = '';
+    if (fab === total && obra === total) {
+      status = 'verde';
+    } else if (fab === total) {
+      status = 'amarelo';
+    } else {
+      status = 'vermelho';
+    }
+
+    return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsumo)) &&
+           (!filtroProduto || item.produto.toLowerCase().includes(filtroProduto)) &&
+           (!filtroCargasSelecionadas.length || filtroCargasSelecionadas.includes(item.cargas)) &&
+           (!filtroStatus || status === filtroStatus);
   });
 
   if (filtrado.length === 0) {
@@ -571,17 +652,27 @@ return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsu
   }
 
   filtrado.forEach(item => {
-    let classe = item.bipado_fabrica > 0 && item.bipado_obra > 0 ? 'status-verde' :
-                 item.bipado_fabrica > 0 ? 'status-amarelo' : 'status-vermelho';
+    const total = parseInt(item.total_necessario);
+    const fab = parseInt(item.bipado_fabrica);
+    const obra = parseInt(item.bipado_obra);
 
-    totalCarga += parseInt(item.total_necessario);
-    totalBipadoFabrica += parseInt(item.bipado_fabrica);
-    totalBipadoObra += parseInt(item.bipado_obra);
+    let classe = '';
+    if (fab === total && obra === total) {
+      classe = 'status-verde';
+    } else if (fab === total) {
+      classe = 'status-amarelo';
+    } else {
+      classe = 'status-vermelho';
+    }
+
+    totalCarga += total;
+    totalBipadoFabrica += fab;
+    totalBipadoObra += obra;
 
     const linha = tabela.insertRow();
     linha.className = classe;
 
-    ["cod_insumo", "produto", "obra", "cargas", "total_necessario", "bipado_fabrica", "bipado_obra"].forEach(campo => {
+    ["cod_insumo", "produto", "obra", "cargas", "total_necessario", "bipado_fabrica", "bipado_embarque", "bipado_obra"].forEach(campo => {
       const celula = linha.insertCell();
       celula.textContent = item[campo];
     });
@@ -597,6 +688,7 @@ return (!filtroCodInsumo || item.cod_insumo.toLowerCase().includes(filtroCodInsu
   // ⚙️ Recria o DataTables com scroller
 $('#relatorioTable').DataTable({
   scrollY: 400,
+  scrollX: true,
   scrollCollapse: true,
   scroller: true,
   paging: true, // ✅ Necessário para funcionar com scroller
@@ -746,6 +838,7 @@ function atualizarGraficos() {
 }
 
 
+
 // Atualiza a cada 5 segundos
 setInterval(atualizarGraficos, 5000);
 
@@ -757,3 +850,4 @@ setInterval(atualizarGraficos, 5000);
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </body>
 </html>
+
