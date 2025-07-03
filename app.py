@@ -1402,6 +1402,28 @@ def excluir_registro(id):
 
 
 
+@app.route('/verificar_storage')
+def verificar_storage():
+    pasta_base = os.getcwd()
+    resultado = []
+
+    for raiz, dirs, arquivos in os.walk(pasta_base):
+        for nome in arquivos:
+            caminho = os.path.join(raiz, nome)
+            try:
+                tamanho = os.path.getsize(caminho) / (1024 * 1024)  # MB
+                if tamanho > 5:  # Mostra apenas arquivos > 5 MB
+                    resultado.append({
+                        "arquivo": caminho.replace(pasta_base, ''),
+                        "tamanho_MB": round(tamanho, 2)
+                    })
+            except:
+                pass
+
+    resultado_ordenado = sorted(resultado, key=lambda x: x['tamanho_MB'], reverse=True)
+    return jsonify(resultado_ordenado)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
