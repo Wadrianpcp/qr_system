@@ -9,15 +9,18 @@
             const tabela = document.getElementById('tabela-corpo');
             tabela.innerHTML = '';
 
+            if (dados.length === 0) {
+                tabela.innerHTML = `<tr><td colspan="3">Nenhum arquivo encontrado.</td></tr>`;
+                return;
+            }
+
             dados.forEach(arquivo => {
                 const linha = document.createElement('tr');
-
                 linha.innerHTML = `
                     <td>${arquivo.arquivo}</td>
                     <td>${arquivo.tamanho_MB} MB</td>
                     <td><button onclick="confirmarExclusao('${arquivo.arquivo}')">Excluir</button></td>
                 `;
-
                 tabela.appendChild(linha);
             });
         }
@@ -55,3 +58,4 @@
     </table>
 </body>
 </html>
+
