@@ -1401,66 +1401,42 @@ def excluir_registro(id):
         return jsonify({"erro": str(e)}), 500
 
 
-# Página HTML com tabela de arquivos
+# Caminho onde estão os arquivos (pode ser .venv, static/uploads, etc)
+BASE_DIR = "/"  # CUIDADO! Aqui está raiz; ajuste conforme necessário para seu projeto
+
 @app.route('/arquivos_servidor')
 def arquivos_servidor():
     return render_template('arquivos_servidor.html')
 
-
-# Rota para listar arquivos grandes no servidor
-@app.route('/listar_arquivos_servidor')
-def listar_arquivos_servidor():
-    base_paths = ['/mnt', '/tmp', '/var', '/var/lib', '/opt', '/srv', '/home', '/root']
+@app.route('/listar_arquivos')
+def listar_arquivos():
     arquivos = []
-
-    try:
-        for base in base_paths:
-            if not os.path.exists(base):
+    for dirpath, _, filenames in os.walk(BASE_DIR):
+        for nome in filenames:
+            try:
+                caminho = os.path.join(dirpath, nome)
+                tamanho = os.path.getsize(caminho)
+                arquivos.append({
+                    "caminho": caminho,
+                    "tamanho": humanize.naturalsize(tamanho, binary=False)
+                })
+            except Exception:
                 continue
+    arquivos.sort(key=lambda x: os.path.getsize(x["caminho"]), reverse=True)
+    return jsonify(arquivos)
 
-            for raiz, _, files in os.walk(base):
-                for nome in files:
-                    try:
-                        caminho = os.path.join(raiz, nome)
-                        tamanho = os.path.getsize(caminho) / (1024 * 1024)  # MB
-
-                        if tamanho > 0.05:  # Mostrar arquivos > 50 KB
-                            arquivos.append({
-                                'arquivo': caminho,
-                                'tamanho_MB': round(tamanho, 2)
-                            })
-                            print(f"[ARQUIVO] {caminho} = {round(tamanho, 2)} MB")
-                    except Exception as e:
-                        print(f"[ERRO] {raiz}/{nome}: {e}")
-                        continue
-
-        arquivos_ordenados = sorted(arquivos, key=lambda x: x['tamanho_MB'], reverse=True)
-        print(f"[INFO] Total arquivos encontrados: {len(arquivos_ordenados)}")
-        return jsonify(arquivos_ordenados[:100])
-
-    except Exception as geral:
-        print(f"[FALHA GERAL] {geral}")
-        return jsonify({"erro": str(geral)}), 500
-
-
-# Rota para deletar arquivo via botão
-@app.route('/deletar_arquivo', methods=['POST'])
-def deletar_arquivo():
-    data = request.json
-    caminho = data.get('caminho')
-
-    # Permitir somente dentro dos diretórios autorizados
-    if not caminho or not caminho.startswith(('/mnt', '/tmp', '/var', '/opt', '/srv', '/home', '/root')):
-        return jsonify({'erro': 'Caminho inválido ou não autorizado'}), 400
-
+@app.route('/excluir_arquivo', methods=['POST'])
+def excluir_arquivo():
+    dados = request.get_json()
+    caminho = dados.get("caminho")
     try:
-        os.remove(caminho)
-        print(f"[DELETADO] {caminho}")
-        return jsonify({'sucesso': True, 'mensagem': f'{caminho} removido com sucesso.'})
+        if caminho and os.path.exists(caminho):
+            os.remove(caminho)
+            return jsonify({"mensagem": "Arquivo excluído com sucesso!"})
+        else:
+            return jsonify({"erro": "Arquivo não encontrado"}), 404
     except Exception as e:
-        print(f"[ERRO AO DELETAR] {caminho}: {e}")
-        return jsonify({'erro': str(e)}), 500
-
+        return jsonify({"erro": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
