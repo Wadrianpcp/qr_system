@@ -4,7 +4,6 @@ import pandas as pd
 from datetime import datetime
 import pytz
 import os
-import humanize
 from psycopg2.extensions import register_adapter, AsIs
 
 def adapt_list(lst):
