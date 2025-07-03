@@ -1402,27 +1402,27 @@ def excluir_registro(id):
 
 
 
-@app.route('/verificar_storage')
-def verificar_storage():
-    pasta_base = os.getcwd()
-    resultado = []
+@app.route('/verificar_storage_render')
+def verificar_storage_render():
+    base_paths = ["/", "/var", "/mnt", "/tmp", "/srv", "/opt"]
+    arquivos_grandes = []
 
-    for raiz, dirs, arquivos in os.walk(pasta_base):
-        for nome in arquivos:
-            caminho = os.path.join(raiz, nome)
-            try:
-                tamanho = os.path.getsize(caminho) / (1024 * 1024)  # MB
-                if tamanho > 5:  # Mostra apenas arquivos > 5 MB
-                    resultado.append({
-                        "arquivo": caminho.replace(pasta_base, ''),
-                        "tamanho_MB": round(tamanho, 2)
-                    })
-            except:
-                pass
+    for base in base_paths:
+        for raiz, _, arquivos in os.walk(base):
+            for nome in arquivos:
+                try:
+                    caminho = os.path.join(raiz, nome)
+                    tamanho = os.path.getsize(caminho) / (1024 * 1024)  # MB
+                    if tamanho > 10:  # Filtrar arquivos maiores que 10 MB
+                        arquivos_grandes.append({
+                            "arquivo": caminho,
+                            "tamanho_MB": round(tamanho, 2)
+                        })
+                except:
+                    continue  # ignora erros de acesso a arquivos protegidos
 
-    resultado_ordenado = sorted(resultado, key=lambda x: x['tamanho_MB'], reverse=True)
-    return jsonify(resultado_ordenado)
-
+    arquivos_ordenados = sorted(arquivos_grandes, key=lambda x: x["tamanho_MB"], reverse=True)
+    return jsonify(arquivos_ordenados[:100])  # retorna os 100 maiores
 
 
 if __name__ == '__main__':
