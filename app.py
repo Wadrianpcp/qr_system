@@ -1401,12 +1401,14 @@ def excluir_registro(id):
         return jsonify({"erro": str(e)}), 500
 
 
+@app.route('/arquivos_servidor')
+def arquivos_servidor():
+    return render_template('arquivos_servidor.html')
+
+
 @app.route('/listar_arquivos_servidor')
 def listar_arquivos_servidor():
-    import os
-    from flask import jsonify
-
-    base_paths = ['/mnt', '/tmp', '/var/log']
+    base_paths = ['/mnt', '/tmp', '/var', '/var/lib', '/opt', '/srv']
     arquivos = []
 
     try:
@@ -1419,7 +1421,7 @@ def listar_arquivos_servidor():
                     try:
                         caminho = os.path.join(raiz, nome)
                         tamanho = os.path.getsize(caminho) / (1024 * 1024)
-                        if tamanho > 1:
+                        if tamanho > 0.05:  # > 50 KB
                             arquivos.append({
                                 'arquivo': caminho,
                                 'tamanho_MB': round(tamanho, 2)
@@ -1441,7 +1443,7 @@ def deletar_arquivo():
     data = request.json
     caminho = data.get('caminho')
 
-    if not caminho or not caminho.startswith(('/mnt', '/tmp', '/var')):
+    if not caminho or not caminho.startswith(('/mnt', '/tmp', '/var', '/opt', '/srv')):
         return jsonify({'erro': 'Caminho inválido ou não autorizado'}), 400
 
     try:
@@ -1449,10 +1451,6 @@ def deletar_arquivo():
         return jsonify({'sucesso': True, 'mensagem': f'{caminho} removido com sucesso.'})
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
-
-@app.route('/arquivos_servidor')
-def arquivos_servidor():
-    return render_template('arquivos_servidor.html')
 
 
 if __name__ == '__main__':
