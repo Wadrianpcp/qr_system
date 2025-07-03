@@ -1403,25 +1403,38 @@ def excluir_registro(id):
 
 @app.route('/listar_arquivos_servidor')
 def listar_arquivos_servidor():
-    base_paths = ['/mnt', '/tmp', '/var']
+    import os
+    from flask import jsonify
+
+    base_paths = ['/mnt', '/tmp', '/var/log']
     arquivos = []
 
-    for base in base_paths:
-        for raiz, _, files in os.walk(base):
-            for nome in files:
-                try:
-                    caminho = os.path.join(raiz, nome)
-                    tamanho = os.path.getsize(caminho) / (1024 * 1024)  # MB
-                    if tamanho > 1:
-                        arquivos.append({
-                            'arquivo': caminho,
-                            'tamanho_MB': round(tamanho, 2)
-                        })
-                except:
-                    continue
+    try:
+        for base in base_paths:
+            if not os.path.exists(base):
+                continue
 
-    arquivos_ordenados = sorted(arquivos, key=lambda x: x['tamanho_MB'], reverse=True)
-    return jsonify(arquivos_ordenados)
+            for raiz, _, files in os.walk(base):
+                for nome in files:
+                    try:
+                        caminho = os.path.join(raiz, nome)
+                        tamanho = os.path.getsize(caminho) / (1024 * 1024)
+                        if tamanho > 1:
+                            arquivos.append({
+                                'arquivo': caminho,
+                                'tamanho_MB': round(tamanho, 2)
+                            })
+                    except Exception as e:
+                        print(f"[ERRO] {caminho}: {e}")
+                        continue
+
+        arquivos_ordenados = sorted(arquivos, key=lambda x: x['tamanho_MB'], reverse=True)
+        return jsonify(arquivos_ordenados[:100])
+
+    except Exception as geral:
+        print(f"[FALHA GERAL] {geral}")
+        return jsonify({"erro": str(geral)}), 500
+
 
 @app.route('/deletar_arquivo', methods=['POST'])
 def deletar_arquivo():
