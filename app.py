@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, request, render_template
+from flask import Flask, request, jsonify, send_file, request, render_template render_template_string, redirect, url_for
 import psycopg2
 import pandas as pd
 from datetime import datetime
@@ -1409,35 +1409,51 @@ BASE_DIR = "/"  # CUIDADO! Aqui está raiz; ajuste conforme necessário para seu
 def arquivos_servidor():
     return render_template('arquivos_servidor.html')
 
-@app.route('/listar_arquivos')
-def listar_arquivos():
-    arquivos = []
-    for dirpath, _, filenames in os.walk(BASE_DIR):
-        for nome in filenames:
-            try:
-                caminho = os.path.join(dirpath, nome)
-                tamanho = os.path.getsize(caminho)
-                arquivos.append({
-                    "caminho": caminho,
-                    "tamanho": humanize.naturalsize(tamanho, binary=False)
-                })
-            except Exception:
-                continue
-    arquivos.sort(key=lambda x: os.path.getsize(x["caminho"]), reverse=True)
-    return jsonify(arquivos)
+@app.route("/arquivos_servidor")
+def arquivos_servidor():
+    arquivos_info = []
+    for nome_arquivo in os.listdir(UPLOAD_FOLDER):
+        caminho_completo = os.path.join(UPLOAD_FOLDER, nome_arquivo)
+        if os.path.isfile(caminho_completo):
+            tamanho = os.path.getsize(caminho_completo)
+            tamanho_mb = round(tamanho / (1024 * 1024), 2)
+            arquivos_info.append((nome_arquivo, tamanho_mb))
+    return render_template_string("""
+        <h2>Arquivos salvos no servidor (pasta uploads/)</h2>
+        <table border="1" cellspacing="0" cellpadding="4">
+            <thead>
+                <tr><th>Arquivo</th><th>Tamanho</th><th>Ação</th></tr>
+            </thead>
+            <tbody>
+                {% for nome_arquivo, tamanho in arquivos %}
+                    <tr>
+                        <td>{{ nome_arquivo }}</td>
+                        <td>{{ tamanho }} MB</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('excluir_arquivo') }}" style="display:inline;">
+                                <input type="hidden" name="nome_arquivo" value="{{ nome_arquivo }}">
+                                <button type="submit" onclick="return confirm('Tem certeza que deseja excluir este arquivo?')">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    """, arquivos=arquivos_info)
 
-@app.route('/excluir_arquivo', methods=['POST'])
+@app.route("/excluir_arquivo", methods=["POST"])
 def excluir_arquivo():
-    dados = request.get_json()
-    caminho = dados.get("caminho")
-    try:
-        if caminho and os.path.exists(caminho):
-            os.remove(caminho)
-            return jsonify({"mensagem": "Arquivo excluído com sucesso!"})
-        else:
-            return jsonify({"erro": "Arquivo não encontrado"}), 404
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
+    nome_arquivo = request.form.get("nome_arquivo")
+    if not nome_arquivo:
+        return "Nome do arquivo inválido.", 400
+
+    caminho_arquivo = os.path.join(UPLOAD_FOLDER, nome_arquivo)
+    if os.path.isfile(caminho_arquivo) and os.path.commonprefix([os.path.realpath(caminho_arquivo), os.path.realpath(UPLOAD_FOLDER)]) == os.path.realpath(UPLOAD_FOLDER):
+        os.remove(caminho_arquivo)
+        return redirect(url_for("arquivos_servidor"))
+    else:
+        return "Arquivo não encontrado ou tentativa de exclusão não permitida.", 403
+
 
 if __name__ == '__main__':
     app.run(debug=True)
