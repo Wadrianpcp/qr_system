@@ -1404,7 +1404,7 @@ def excluir_registro(id):
 
 @app.route('/verificar_storage_render')
 def verificar_storage_render():
-    base_paths = ["/", "/var", "/mnt", "/tmp", "/srv", "/opt"]
+    base_paths = ["/mnt", "/var/log", "/tmp"]
     arquivos_grandes = []
 
     for base in base_paths:
@@ -1413,16 +1413,16 @@ def verificar_storage_render():
                 try:
                     caminho = os.path.join(raiz, nome)
                     tamanho = os.path.getsize(caminho) / (1024 * 1024)  # MB
-                    if tamanho > 10:  # Filtrar arquivos maiores que 10 MB
+                    if tamanho > 5:
                         arquivos_grandes.append({
                             "arquivo": caminho,
                             "tamanho_MB": round(tamanho, 2)
                         })
-                except:
-                    continue  # ignora erros de acesso a arquivos protegidos
+                except Exception:
+                    continue  # ignora arquivos protegidos ou quebrados
 
     arquivos_ordenados = sorted(arquivos_grandes, key=lambda x: x["tamanho_MB"], reverse=True)
-    return jsonify(arquivos_ordenados[:100])  # retorna os 100 maiores
+    return jsonify(arquivos_ordenados[:100])
 
 
 if __name__ == '__main__':
