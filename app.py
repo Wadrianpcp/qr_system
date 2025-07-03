@@ -1,9 +1,12 @@
-from flask import Flask, request, jsonify, send_file, request, render_template render_template_string, redirect, url_for
+import os
+from flask import Flask, request, jsonify, send_file, render_template, redirect
 import psycopg2
+from werkzeug.utils import secure_filename
 import pandas as pd
 from datetime import datetime
 import pytz
-import os
+from decimal import Decimal
+import math
 from psycopg2.extensions import register_adapter, AsIs
 
 def adapt_list(lst):
