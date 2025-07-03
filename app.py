@@ -1,9 +1,9 @@
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file, request, render_template
 import psycopg2
 import pandas as pd
 from datetime import datetime
 import pytz
-
+import os
 from psycopg2.extensions import register_adapter, AsIs
 
 def adapt_list(lst):
@@ -1401,14 +1401,16 @@ def excluir_registro(id):
         return jsonify({"erro": str(e)}), 500
 
 
+# Página HTML com tabela de arquivos
 @app.route('/arquivos_servidor')
 def arquivos_servidor():
     return render_template('arquivos_servidor.html')
 
 
+# Rota para listar arquivos grandes no servidor
 @app.route('/listar_arquivos_servidor')
 def listar_arquivos_servidor():
-    base_paths = ['/mnt', '/tmp', '/var', '/var/lib', '/opt', '/srv']
+    base_paths = ['/mnt', '/tmp', '/var', '/var/lib', '/opt', '/srv', '/home', '/root']
     arquivos = []
 
     try:
@@ -1420,17 +1422,20 @@ def listar_arquivos_servidor():
                 for nome in files:
                     try:
                         caminho = os.path.join(raiz, nome)
-                        tamanho = os.path.getsize(caminho) / (1024 * 1024)
-                        if tamanho > 0.05:  # > 50 KB
+                        tamanho = os.path.getsize(caminho) / (1024 * 1024)  # MB
+
+                        if tamanho > 0.05:  # Mostrar arquivos > 50 KB
                             arquivos.append({
                                 'arquivo': caminho,
                                 'tamanho_MB': round(tamanho, 2)
                             })
+                            print(f"[ARQUIVO] {caminho} = {round(tamanho, 2)} MB")
                     except Exception as e:
-                        print(f"[ERRO] {caminho}: {e}")
+                        print(f"[ERRO] {raiz}/{nome}: {e}")
                         continue
 
         arquivos_ordenados = sorted(arquivos, key=lambda x: x['tamanho_MB'], reverse=True)
+        print(f"[INFO] Total arquivos encontrados: {len(arquivos_ordenados)}")
         return jsonify(arquivos_ordenados[:100])
 
     except Exception as geral:
@@ -1438,18 +1443,22 @@ def listar_arquivos_servidor():
         return jsonify({"erro": str(geral)}), 500
 
 
+# Rota para deletar arquivo via botão
 @app.route('/deletar_arquivo', methods=['POST'])
 def deletar_arquivo():
     data = request.json
     caminho = data.get('caminho')
 
-    if not caminho or not caminho.startswith(('/mnt', '/tmp', '/var', '/opt', '/srv')):
+    # Permitir somente dentro dos diretórios autorizados
+    if not caminho or not caminho.startswith(('/mnt', '/tmp', '/var', '/opt', '/srv', '/home', '/root')):
         return jsonify({'erro': 'Caminho inválido ou não autorizado'}), 400
 
     try:
         os.remove(caminho)
+        print(f"[DELETADO] {caminho}")
         return jsonify({'sucesso': True, 'mensagem': f'{caminho} removido com sucesso.'})
     except Exception as e:
+        print(f"[ERRO AO DELETAR] {caminho}: {e}")
         return jsonify({'erro': str(e)}), 500
 
 
