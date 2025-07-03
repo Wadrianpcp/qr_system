@@ -1,46 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Arquivos no Servidor</title>
-    <script>
-        async function carregarArquivos() {
-            const resposta = await fetch('/listar_arquivos_servidor');
-            const dados = await resposta.json();
-            const tabela = document.getElementById('tabela-corpo');
-            tabela.innerHTML = '';
-
-            if (dados.length === 0) {
-                tabela.innerHTML = `<tr><td colspan="3">Nenhum arquivo encontrado.</td></tr>`;
-                return;
-            }
-
-            dados.forEach(arquivo => {
-                const linha = document.createElement('tr');
-                linha.innerHTML = `
-                    <td>${arquivo.arquivo}</td>
-                    <td>${arquivo.tamanho_MB} MB</td>
-                    <td><button onclick="confirmarExclusao('${arquivo.arquivo}')">Excluir</button></td>
-                `;
-                tabela.appendChild(linha);
-            });
-        }
-
-        async function confirmarExclusao(caminho) {
-            if (!confirm(`Tem certeza que deseja excluir:\n${caminho} ?`)) return;
-
-            const resposta = await fetch('/deletar_arquivo', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({caminho})
-            });
-
-            const resultado = await resposta.json();
-            alert(resultado.mensagem || resultado.erro);
-            carregarArquivos();
-        }
-
-        window.onload = carregarArquivos;
-    </script>
 </head>
 <body>
     <h2>Arquivos salvos no servidor</h2>
@@ -52,10 +14,54 @@
                 <th>Ação</th>
             </tr>
         </thead>
-        <tbody id="tabela-corpo">
+        <tbody id="tabela-arquivos">
             <tr><td colspan="3">Carregando...</td></tr>
         </tbody>
     </table>
+
+    <script>
+        async function carregarArquivos() {
+            const resposta = await fetch('/listar_arquivos');
+            const dados = await resposta.json();
+            const corpo = document.getElementById('tabela-arquivos');
+            corpo.innerHTML = '';
+
+            if (dados.length === 0) {
+                corpo.innerHTML = '<tr><td colspan="3">Nenhum arquivo encontrado.</td></tr>';
+                return;
+            }
+
+            dados.forEach(arquivo => {
+                const linha = document.createElement('tr');
+
+                const tdCaminho = document.createElement('td');
+                tdCaminho.textContent = arquivo.caminho;
+                linha.appendChild(tdCaminho);
+
+                const tdTamanho = document.createElement('td');
+                tdTamanho.textContent = arquivo.tamanho;
+                linha.appendChild(tdTamanho);
+
+                const tdAcao = document.createElement('td');
+                const botao = document.createElement('button');
+                botao.textContent = 'Excluir';
+                botao.onclick = () => {
+                    if (confirm(`Deseja excluir o arquivo:\n${arquivo.caminho}?`)) {
+                        fetch('/excluir_arquivo', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({caminho: arquivo.caminho})
+                        }).then(() => carregarArquivos());
+                    }
+                };
+                tdAcao.appendChild(botao);
+                linha.appendChild(tdAcao);
+
+                corpo.appendChild(linha);
+            });
+        }
+
+        carregarArquivos();
+    </script>
 </body>
 </html>
-
