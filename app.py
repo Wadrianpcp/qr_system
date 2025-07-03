@@ -1402,59 +1402,6 @@ def excluir_registro(id):
         return jsonify({"erro": str(e)}), 500
 
 
-# Caminho onde estão os arquivos (pode ser .venv, static/uploads, etc)
-BASE_DIR = "/"  # CUIDADO! Aqui está raiz; ajuste conforme necessário para seu projeto
-
-@app.route('/arquivos_servidor')
-def arquivos_servidor():
-    return render_template('arquivos_servidor.html')
-
-@app.route("/arquivos_servidor")
-def arquivos_servidor():
-    arquivos_info = []
-    for nome_arquivo in os.listdir(UPLOAD_FOLDER):
-        caminho_completo = os.path.join(UPLOAD_FOLDER, nome_arquivo)
-        if os.path.isfile(caminho_completo):
-            tamanho = os.path.getsize(caminho_completo)
-            tamanho_mb = round(tamanho / (1024 * 1024), 2)
-            arquivos_info.append((nome_arquivo, tamanho_mb))
-    return render_template_string("""
-        <h2>Arquivos salvos no servidor (pasta uploads/)</h2>
-        <table border="1" cellspacing="0" cellpadding="4">
-            <thead>
-                <tr><th>Arquivo</th><th>Tamanho</th><th>Ação</th></tr>
-            </thead>
-            <tbody>
-                {% for nome_arquivo, tamanho in arquivos %}
-                    <tr>
-                        <td>{{ nome_arquivo }}</td>
-                        <td>{{ tamanho }} MB</td>
-                        <td>
-                            <form method="POST" action="{{ url_for('excluir_arquivo') }}" style="display:inline;">
-                                <input type="hidden" name="nome_arquivo" value="{{ nome_arquivo }}">
-                                <button type="submit" onclick="return confirm('Tem certeza que deseja excluir este arquivo?')">Excluir</button>
-                            </form>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    """, arquivos=arquivos_info)
-
-@app.route("/excluir_arquivo", methods=["POST"])
-def excluir_arquivo():
-    nome_arquivo = request.form.get("nome_arquivo")
-    if not nome_arquivo:
-        return "Nome do arquivo inválido.", 400
-
-    caminho_arquivo = os.path.join(UPLOAD_FOLDER, nome_arquivo)
-    if os.path.isfile(caminho_arquivo) and os.path.commonprefix([os.path.realpath(caminho_arquivo), os.path.realpath(UPLOAD_FOLDER)]) == os.path.realpath(UPLOAD_FOLDER):
-        os.remove(caminho_arquivo)
-        return redirect(url_for("arquivos_servidor"))
-    else:
-        return "Arquivo não encontrado ou tentativa de exclusão não permitida.", 403
-
-
 if __name__ == '__main__':
     app.run(debug=True)
                                                                             
