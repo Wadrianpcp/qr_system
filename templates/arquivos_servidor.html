@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Arquivos no Servidor</title>
+    <script>
+        async function carregarArquivos() {
+            const resposta = await fetch('/listar_arquivos_servidor');
+            const dados = await resposta.json();
+            const tabela = document.getElementById('tabela-corpo');
+            tabela.innerHTML = '';
+
+            dados.forEach(arquivo => {
+                const linha = document.createElement('tr');
+
+                linha.innerHTML = `
+                    <td>${arquivo.arquivo}</td>
+                    <td>${arquivo.tamanho_MB} MB</td>
+                    <td><button onclick="confirmarExclusao('${arquivo.arquivo}')">Excluir</button></td>
+                `;
+
+                tabela.appendChild(linha);
+            });
+        }
+
+        async function confirmarExclusao(caminho) {
+            if (!confirm(`Tem certeza que deseja excluir:\n${caminho} ?`)) return;
+
+            const resposta = await fetch('/deletar_arquivo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({caminho})
+            });
+
+            const resultado = await resposta.json();
+            alert(resultado.mensagem || resultado.erro);
+            carregarArquivos();
+        }
+
+        window.onload = carregarArquivos;
+    </script>
+</head>
+<body>
+    <h2>Arquivos salvos no servidor</h2>
+    <table border="1" width="100%">
+        <thead>
+            <tr>
+                <th>Arquivo</th>
+                <th>Tamanho</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+        <tbody id="tabela-corpo">
+            <tr><td colspan="3">Carregando...</td></tr>
+        </tbody>
+    </table>
+</body>
+</html>
