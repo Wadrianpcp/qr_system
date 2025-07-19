@@ -7,6 +7,8 @@ from datetime import datetime
 import pytz
 from decimal import Decimal
 import math
+
+
 from psycopg2.extensions import register_adapter, AsIs
 
 def adapt_list(lst):
@@ -26,7 +28,7 @@ def get_db_connection():
 
 @app.route('/')
 def index():
-    return send_file('index.html')
+    return send_file('tela_inicial.html')
 
 
 @app.route('/grafico_nes')
@@ -34,9 +36,9 @@ def grafico_nes():
     return send_file('grafico_nes.html')
 
 
-@app.route('/inicio')
+@app.route('/embalagem')
 def tela_inicial():
-    return send_file('tela_inicial.html')
+    return send_file('index.html')
 
 @app.route('/produtividade')
 def produtividade():
@@ -82,6 +84,11 @@ def importar_lista():
 @app.route('/lista_carga')
 def lista_carga():
     return send_file('lista_carga.html')
+
+
+@app.route('/relatorio_perdas')
+def relatorio_perdas():
+    return render_template('relatorio_perdas.html')
 
 @app.route('/relatorio')
 def relatorio():
@@ -212,6 +219,7 @@ def registrar_produtividade():
 
     operacao = data.get("operacao")
     obra = data.get("obra")
+    lote = data.get("lote")  # <- pegando do JSON
     ocorrencia = data.get("ocorrencia")
     hr_inicio = data.get("hr_inicio")
     hr_fim = data.get("hr_fim")
@@ -243,13 +251,14 @@ def registrar_produtividade():
         conn = get_db_connection()
         cur = conn.cursor()
 
+        # 🔽 Adicione "lote" nas colunas e nos valores:
         cur.execute("""
             INSERT INTO registro_produtividade (
-                operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
+                operacao, obra, lote, ocorrencia, hr_inicio, hr_fim, qtd_ch,
                 data, operador, material, horas_disponivel, maquina, pecas_cortadas, observacao
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
-            operacao, obra, ocorrencia, hr_inicio, hr_fim,
+            operacao, obra, lote, ocorrencia, hr_inicio, hr_fim,
             qtd_ch, data_registro, operador, material,
             horas_disponivel, maquina, pecas_cortadas, observacao
         ))
@@ -262,6 +271,7 @@ def registrar_produtividade():
 
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
+
 
 
 @app.route('/material')
@@ -313,7 +323,6 @@ def obras_lotes():
         conn.close()
 
 
-
 @app.route('/dados_grafico', methods=['POST'])
 def dados_grafico():
     data = request.get_json()
@@ -324,14 +333,14 @@ def dados_grafico():
     cur = conn.cursor()
 
     # Atualiza a view antes de consultar
-    cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_embarque_mv;")
+#    cur.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_embarque_mv;")
 
     query = """
         SELECT 
             SUM(total_necessario) AS total_carga,
             SUM(bipado_fabrica) AS bipado_fabrica,
             SUM(bipado_obra) AS bipado_obra
-        FROM relatorio_atendimento_carga_embarque_mv
+        FROM relatorio_atendimento_carga_embarque_mv2
         WHERE 1=1
     """
     params = []
@@ -704,7 +713,7 @@ def atualizar_relatorio_mv():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("REFRESH MATERIALIZED VIEW relatorio_atendimento_carga_embarque_mv;")  # 🔄 sem CONCURRENTLY
+#        cur.execute("REFRESH MATERIALIZED VIEW relatorio_atendimento_carga_embarque_mv;")  # 🔄 sem CONCURRENTLY
         conn.commit()
         cur.close()
         conn.close()
@@ -724,7 +733,7 @@ def relatorio_diferencas():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        query = "SELECT * FROM relatorio_atendimento_carga_embarque_mv WHERE 1=1"
+        query = "SELECT * FROM relatorio_atendimento_carga_embarque_mv2 WHERE 1=1"
         parametros = []
 
         if obra:
@@ -850,7 +859,7 @@ def atualizar_view():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_embarque_mv;')
+#        cur.execute('REFRESH MATERIALIZED VIEW CONCURRENTLY relatorio_atendimento_carga_embarque_mv;')
         conn.commit()
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -1402,6 +1411,681 @@ def excluir_registro(id):
         return jsonify({"sucesso": True})
     except Exception as e:
         return jsonify({"erro": str(e)}), 500
+
+
+
+
+# Rota para exibir o formulário de upload
+@app.route('/upload_perda')
+def upload_perda_form():
+    return render_template('upload_perda.html')
+
+@app.route('/upload_retrabalho', methods=['POST'])
+def upload_retrabalho():
+    if 'arquivo' not in request.files:
+        return jsonify({'erro': 'Nenhum arquivo enviado'}), 400
+
+    arquivo = request.files['arquivo']
+    if arquivo.filename == '':
+        return jsonify({'erro': 'Nome de arquivo vazio'}), 400
+
+    try:
+        df = pd.read_excel(arquivo)
+
+        colunas_esperadas = [
+            "data", "obra", "lote", "produto", "of", "descricao", "comp", "larg",
+            "qtd_perdida", "qtd_finalizada", "m2_chapa", "material", "fluxo",
+            "fitação", "motivo", "local", "status", "descricao_perda", "obs",
+            "status_obra", "data_reposicao"
+        ]
+        if not all(col in df.columns for col in colunas_esperadas):
+            return jsonify({'erro': 'As colunas do Excel não correspondem às esperadas.'}), 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        for _, row in df.iterrows():
+            def parse_int(valor):
+                try:
+                    if pd.isna(valor) or str(valor).strip().lower() in ['', 'nan', '(vazio)']:
+                        return 0
+                    return int(valor)
+                except:
+                    return 0
+
+            def parse_float(valor):
+                try:
+                    if pd.isna(valor) or str(valor).strip().lower() in ['', 'nan', '(vazio)']:
+                        return 0.0
+                    return float(valor)
+                except:
+                    return 0.0
+
+            def parse_date(valor):
+                if pd.isna(valor) or str(valor).strip().lower() in ['0', '0.0', '', '(vazio)']:
+                    return None
+                return pd.to_datetime(valor).date()
+
+            def parse_str(valor):
+                return str(valor).strip() if pd.notna(valor) and str(valor).strip().lower() != '(vazio)' else ''
+
+            data_reposicao = parse_date(row["data_reposicao"])
+            lote_str = parse_str(row["lote"])
+            of_str = parse_str(row["of"])
+
+            cur.execute("""
+                SELECT * FROM retrabalho_producao
+                WHERE data = %s AND obra = %s AND lote = %s AND produto = %s AND of = %s
+            """, (row["data"], row["obra"], lote_str, row["produto"], of_str))
+            existente = cur.fetchone()
+
+            if existente:
+                cur.execute("""
+                    UPDATE retrabalho_producao SET
+                        descricao=%s, comp=%s, larg=%s, qtd_perdida=%s, qtd_finalizada=%s,
+                        m2_chapa=%s, material=%s, fluxo=%s, fitação=%s, motivo=%s,
+                        local=%s, status=%s, descricao_perda=%s, obs=%s,
+                        status_obra=%s, data_reposicao=%s
+                    WHERE data = %s AND obra = %s AND lote = %s AND produto = %s AND of = %s
+                """, (
+                    parse_str(row["descricao"]), parse_int(row["comp"]), parse_int(row["larg"]),
+                    parse_int(row["qtd_perdida"]), parse_int(row["qtd_finalizada"]),
+                    parse_float(row["m2_chapa"]), parse_str(row["material"]), parse_str(row["fluxo"]),
+                    parse_str(row["fitação"]), parse_str(row["motivo"]), parse_str(row["local"]),
+                    parse_str(row["status"]), parse_str(row["descricao_perda"]), parse_str(row["obs"]),
+                    parse_str(row["status_obra"]), data_reposicao,
+                    row["data"], row["obra"], lote_str, row["produto"], of_str
+                ))
+            else:
+                cur.execute("""
+                    INSERT INTO retrabalho_producao (
+                        data, obra, lote, produto, of, descricao, comp, larg, qtd_perdida, qtd_finalizada,
+                        m2_chapa, material, fluxo, fitação, motivo, local, status,
+                        descricao_perda, obs, status_obra, data_reposicao
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    row["data"], row["obra"], lote_str, row["produto"], of_str,
+                    parse_str(row["descricao"]), parse_int(row["comp"]), parse_int(row["larg"]),
+                    parse_int(row["qtd_perdida"]), parse_int(row["qtd_finalizada"]),
+                    parse_float(row["m2_chapa"]), parse_str(row["material"]), parse_str(row["fluxo"]),
+                    parse_str(row["fitação"]), parse_str(row["motivo"]), parse_str(row["local"]),
+                    parse_str(row["status"]), parse_str(row["descricao_perda"]),
+                    parse_str(row["obs"]), parse_str(row["status_obra"]), data_reposicao
+                ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({'mensagem': 'Importação concluída com sucesso.'}), 200
+
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
+
+# 🔹 Qtd itens não conformes (qtd_perdida)
+@app.route('/dados_perdas')
+def dados_perdas():
+    try:
+        obra = request.args.get("obra")
+        material = request.args.get("material")
+        motivo = request.args.get("motivo")
+        ponto = request.args.get("ponto")
+        data_inicio = request.args.get('dataInicio')
+        data_fim = request.args.get('dataFim')
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        query = "SELECT SUM(qtd_perdida) FROM retrabalho_producao WHERE 1=1"
+        params = []
+
+        if obra and obra != "Todas":
+            query += " AND obra = %s"
+            params.append(obra)
+        if material and material != "Todos":
+            query += " AND material = %s"
+            params.append(material)
+        if motivo and motivo != "Todos":
+            query += " AND motivo = %s"
+            params.append(motivo)
+        if ponto and ponto != "Todos":
+            query += " AND local = %s"
+            params.append(ponto)
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+
+        cur.execute(query, tuple(params))
+        resultado = cur.fetchone()
+        qtd = int(resultado[0]) if resultado[0] else 0
+
+        return jsonify({"qtd_perdida": qtd})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+# 🔹 Qtd CH cortadas
+@app.route('/dados_ch_cortadas')
+def dados_ch_cortadas():
+    try:
+        obra = request.args.get('obra')
+        material = request.args.get('material')
+        data_inicio = request.args.get('dataInicio')
+        data_fim = request.args.get('dataFim')
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        query = "SELECT SUM(qtd_ch) FROM registro_produtividade WHERE 1=1"
+        params = []
+        if obra and obra != "Todas":
+            query += " AND obra = %s"
+            params.append(obra)
+        if material and material != "Todos":
+            query += " AND material = %s"
+            params.append(material)
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+
+        cur.execute(query, params)
+        resultado = cur.fetchone()
+        qtd = int(resultado[0]) if resultado[0] else 0
+
+        return jsonify({"qtd_ch_total": qtd})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+# 🔹 Qtd peças cortadas
+@app.route('/dados_pecas_cortadas')
+def dados_pecas_cortadas():
+    try:
+        obra = request.args.get('obra')
+        material = request.args.get('material')
+        data_inicio = request.args.get('dataInicio')
+        data_fim = request.args.get('dataFim')
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        query = "SELECT SUM(pecas_cortadas) FROM registro_produtividade WHERE 1=1"
+        params = []
+        if obra and obra != "Todas":
+            query += " AND obra = %s"
+            params.append(obra)
+        if material and material != "Todos":
+            query += " AND material = %s"
+            params.append(material)
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+
+        cur.execute(query, tuple(params))
+        resultado = cur.fetchone()
+        qtd = int(resultado[0]) if resultado[0] else 0
+
+        return jsonify({"qtd_pecas": qtd})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+# 🔹 Estimativa de perda (m2_chapa)
+@app.route('/dados_m2_chapa')
+def dados_m2_chapa():
+    try:
+        obra = request.args.get('obra')
+        material = request.args.get('material')
+        data_inicio = request.args.get('dataInicio')
+        data_fim = request.args.get('dataFim')
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        query = "SELECT SUM(m2_chapa) FROM retrabalho_producao WHERE m2_chapa IS NOT NULL"
+        params = []
+        if obra and obra != "Todas":
+            query += " AND obra = %s"
+            params.append(obra)
+        if material and material != "Todos":
+            query += " AND material = %s"
+            params.append(material)
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+
+        cur.execute(query, params)
+        resultado = cur.fetchone()
+
+        valor = resultado[0]
+        if valor is None or not isinstance(valor, (int, float, Decimal)) or math.isnan(float(valor)):
+            valor = 0.0
+
+        return jsonify({"valor": round(float(valor), 2)})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route("/obras_disponiveis_retrabalho")
+def obras_disponiveis_retrabalho():
+    try:
+        data_inicio = request.args.get("dataInicio")
+        data_fim = request.args.get("dataFim")
+        motivo = request.args.get("motivo")
+        material = request.args.get("material")  # ✅ novo
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        query = "SELECT DISTINCT obra FROM retrabalho_producao WHERE obra IS NOT NULL AND obra <> ''"
+        params = []
+
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+        if motivo and motivo != "Todos":
+            query += " AND motivo = %s"
+            params.append(motivo)
+        if material and material != "Todos":  # ✅ novo
+            query += " AND material = %s"
+            params.append(material)
+
+        query += " ORDER BY obra"
+
+        cur.execute(query, tuple(params))
+        obras = [linha[0] for linha in cur.fetchall()]
+        return jsonify(obras)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+# 🔹 Rota para listar materiais únicos com filtro por data e obra
+@app.route("/materiais_disponiveis_retrabalho")
+def materiais_disponiveis_retrabalho():
+    try:
+        data_inicio = request.args.get("dataInicio")
+        data_fim = request.args.get("dataFim")
+        obra = request.args.get("obra")
+
+        query = """
+            SELECT DISTINCT material
+            FROM retrabalho_producao
+            WHERE material IS NOT NULL AND material <> ''
+        """
+        params = []
+
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+        if obra and obra != "Todas":
+            query += " AND obra = %s"
+            params.append(obra)
+
+        query += " ORDER BY material"
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(query, tuple(params))
+        materiais = [linha[0] for linha in cur.fetchall()]
+        return jsonify(materiais)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+
+# 🔹 Gráfico: motivo da perda
+@app.route("/grafico_motivo_perda")
+def grafico_motivo_perda():
+    try:
+        obra = request.args.get("obra")
+        material = request.args.get("material")
+        data_inicio = request.args.get("dataInicio")
+        data_fim = request.args.get("dataFim")
+        motivo = request.args.get("motivo")
+        ponto = request.args.get("ponto")  # NOVO
+
+        query = "SELECT motivo, COUNT(*) FROM retrabalho_producao WHERE motivo IS NOT NULL AND motivo <> ''"
+        params = []
+
+        if obra and obra != "Todas":
+            query += " AND obra = %s"
+            params.append(obra)
+        if material and material != "Todos":
+            query += " AND material = %s"
+            params.append(material)
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+        if motivo and motivo != "Todos":
+            query += " AND motivo = %s"
+            params.append(motivo)
+        if ponto and ponto != "Todos":
+            query += " AND local = %s"
+            params.append(ponto)
+
+        query += " GROUP BY motivo ORDER BY COUNT(*) DESC"
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(query, tuple(params))
+        resultados = cur.fetchall()
+
+        total_geral = sum(row[1] for row in resultados)
+        labels = []
+        valores = []
+
+        for motivo, total in resultados:
+            labels.append(motivo)
+            percentual = round((total / total_geral) * 100, 2) if total_geral else 0
+            valores.append(percentual)
+
+        cur.close()
+        conn.close()
+
+        return jsonify({"labels": labels, "valores": valores})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+
+# 🔹 Gráfico: ponto de identificação
+@app.route("/grafico_ponto_identificacao")
+def grafico_ponto_identificacao():
+    try:
+        # Compatível com obra como string única
+        obra = request.args.get("obra")
+        material = request.args.get("material")
+        data_inicio = request.args.get("dataInicio")
+        data_fim = request.args.get("dataFim")
+        motivo = request.args.get("motivo")
+        ponto = request.args.get("ponto")
+
+        filtros = []
+        valores = []
+
+        if obra and obra != "Todas":
+            filtros.append("obra = %s")
+            valores.append(obra)
+
+        if material and material != "Todos":
+            filtros.append("material = %s")
+            valores.append(material)
+
+        if data_inicio:
+            filtros.append("data >= %s")
+            valores.append(data_inicio)
+
+        if data_fim:
+            filtros.append("data <= %s")
+            valores.append(data_fim)
+
+        if motivo and motivo != "Todos":
+            filtros.append("motivo = %s")
+            valores.append(motivo)
+
+        if ponto and ponto != "Todos":
+            filtros.append("local = %s")
+            valores.append(ponto)
+
+        where_clause = "WHERE " + " AND ".join(filtros) if filtros else ""
+
+        query = f"""
+            SELECT COALESCE(local, 'Em branco') AS ponto, COUNT(*) AS qtd
+            FROM retrabalho_producao
+            {where_clause}
+            GROUP BY ponto
+            ORDER BY qtd DESC
+        """
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(query, tuple(valores))
+        resultados = cur.fetchall()
+
+        total = sum([row[1] for row in resultados]) or 1
+        labels = [row[0] for row in resultados]
+        porcentagens = [round((row[1] / total) * 100, 1) for row in resultados]
+
+        cur.close()
+        conn.close()
+
+        return jsonify({"labels": labels, "valores": porcentagens})
+
+    except Exception as e:
+        print("Erro em /grafico_ponto_identificacao:", e)
+        return jsonify({"erro": str(e)}), 500
+
+
+
+
+# 🔹 Percentual de perda (estimativa_perda_ch / qtd_ch_total)
+@app.route('/percentual_perda_ch')
+def percentual_perda_ch():
+    try:
+        data_inicio = request.args.get("dataInicio")
+        data_fim = request.args.get("dataFim")
+        obra = request.args.get("obra")
+        material = request.args.get("material")
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Estimativa de perda Ch (m2_chapa)
+        query_m2 = "SELECT SUM(m2_chapa) FROM retrabalho_producao WHERE m2_chapa IS NOT NULL"
+        params_m2 = []
+        if obra and obra != "Todas":
+            query_m2 += " AND obra = %s"
+            params_m2.append(obra)
+        if material and material != "Todos":
+            query_m2 += " AND material = %s"
+            params_m2.append(material)
+        if data_inicio:
+            query_m2 += " AND data >= %s"
+            params_m2.append(data_inicio)
+        if data_fim:
+            query_m2 += " AND data <= %s"
+            params_m2.append(data_fim)
+
+        cur.execute(query_m2, params_m2)
+        m2_chapa = cur.fetchone()[0] or 0
+
+        # Qtd Ch cortadas
+        query_ch = "SELECT SUM(qtd_ch) FROM registro_produtividade WHERE 1=1"
+        params_ch = []
+        if data_inicio:
+            query_ch += " AND data >= %s"
+            params_ch.append(data_inicio)
+        if data_fim:
+            query_ch += " AND data <= %s"
+            params_ch.append(data_fim)
+
+        cur.execute(query_ch, params_ch)
+        qtd_ch = cur.fetchone()[0] or 0
+
+        percentual = round((float(m2_chapa) / qtd_ch) * 100, 2) if qtd_ch else 0
+
+        cur.close()
+        conn.close()
+
+        return jsonify({"percentual_perda": percentual})
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+@app.route("/motivos_disponiveis_retrabalho")
+def motivos_disponiveis_retrabalho():
+    try:
+        data_inicio = request.args.get("dataInicio")
+        data_fim = request.args.get("dataFim")
+        obra = request.args.get("obra")
+        material = request.args.get("material")  # ✅ novo
+
+        query = "SELECT DISTINCT motivo FROM retrabalho_producao WHERE motivo IS NOT NULL AND motivo <> ''"
+        params = []
+
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+        if obra and obra != "Todas":
+            query += " AND obra = %s"
+            params.append(obra)
+        if material and material != "Todos":  # ✅ novo
+            query += " AND material = %s"
+            params.append(material)
+
+        query += " ORDER BY motivo"
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(query, tuple(params))
+        motivos = [linha[0] for linha in cur.fetchall()]
+        return jsonify(motivos)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+
+
+@app.route("/pontos_disponiveis_retrabalho")
+def pontos_disponiveis_retrabalho():
+    try:
+        data_inicio = request.args.get("dataInicio")
+        data_fim = request.args.get("dataFim")
+        obra = request.args.get("obra")
+        material = request.args.get("material")  # ✅ novo
+        motivo = request.args.get("motivo")      # ✅ opcional
+
+        query = """
+            SELECT DISTINCT local
+            FROM retrabalho_producao
+            WHERE local IS NOT NULL AND local <> ''
+        """
+        params = []
+
+        if data_inicio:
+            query += " AND data >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND data <= %s"
+            params.append(data_fim)
+        if obra and obra != "Todas":
+            query += " AND obra = %s"
+            params.append(obra)
+        if material and material != "Todos":
+            query += " AND material = %s"
+            params.append(material)
+        if motivo and motivo != "Todos":
+            query += " AND motivo = %s"
+            params.append(motivo)
+
+        query += " ORDER BY local"
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(query, tuple(params))
+        locais = [linha[0] for linha in cur.fetchall()]
+        return jsonify(locais)
+    except Exception as e:
+        return jsonify({"erro": str(e)}), 500
+
+from datetime import date, datetime
+
+@app.route('/dados_detalhados_perdas')
+def dados_detalhados_perdas():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Recebe os parâmetros de filtro
+        obra = request.args.get('obra')
+        material = request.args.get('material')
+        motivo = request.args.get('motivo')
+        ponto = request.args.get('ponto')
+        data_inicio = request.args.get('dataInicio')
+        data_fim = request.args.get('dataFim')
+
+        # Monta a cláusula WHERE dinamicamente
+        filtros = []
+        valores = []
+
+        if obra and obra != "Todas":
+            filtros.append("obra = %s")
+            valores.append(obra)
+        if material and material != "Todos":
+            filtros.append("material = %s")
+            valores.append(material)
+        if motivo and motivo != "Todos":
+            filtros.append("motivo = %s")
+            valores.append(motivo)
+        if ponto and ponto != "Todos":
+            filtros.append("local = %s")
+            valores.append(ponto)
+        if data_inicio:
+            filtros.append("data >= %s")
+            valores.append(data_inicio)
+        if data_fim:
+            filtros.append("data <= %s")
+            valores.append(data_fim)
+
+        where_clause = f"WHERE {' AND '.join(filtros)}" if filtros else ""
+
+        query = f"""
+            SELECT
+                data, obra, lote, produto, of, descricao, comp, larg,
+                qtd_perdida, m2_chapa, material, fluxo, fitação,
+                motivo, local, status, descricao_perda, obs, data_reposicao
+            FROM retrabalho_producao
+            {where_clause}
+            ORDER BY data DESC
+        """
+
+        cur.execute(query, valores)
+        rows = cur.fetchall()
+
+        colunas = [
+            'data', 'obra', 'lote', 'produto', 'of', 'descricao', 'comp', 'larg',
+            'qtd_perdida', 'm2_chapa', 'material', 'fluxo', 'fitação',
+            'motivo', 'local', 'status', 'descricao_perda', 'obs', 'data_reposicao'
+        ]
+
+        def formatar_data(valor):
+            if isinstance(valor, (date, datetime)):
+                return valor.strftime('%Y-%m-%d')
+            return valor
+
+        resultados = [
+            {col: formatar_data(val) for col, val in zip(colunas, row)}
+            for row in rows
+        ]
+
+        return jsonify(resultados)
+
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
+
+
 
 
 if __name__ == '__main__':
