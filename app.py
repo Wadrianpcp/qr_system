@@ -2086,6 +2086,82 @@ def dados_detalhados_perdas():
         return jsonify({'erro': str(e)}), 500
 
 
+@app.route('/dados_tabela_produtividade', methods=['POST'])
+def dados_tabela_produtividade():
+    dados = request.json
+    obra = dados.get('obra')
+    data_inicio = dados.get('data_inicio')
+    data_fim = dados.get('data_fim')
+    operacao = dados.get('operacao')
+    material = dados.get('material')
+    maquina = dados.get('maquina')
+
+    filtros = []
+    valores = []
+
+    # Construção dinâmica dos filtros (igual à rota do relatório)
+    if obra and "Todos" not in obra:
+        filtros.append("obra = ANY(%s)")
+        valores.append(obra if isinstance(obra, list) else [obra])
+    if data_inicio:
+        filtros.append("data >= %s")
+        valores.append(data_inicio)
+    if data_fim:
+        filtros.append("data <= %s")
+        valores.append(data_fim)
+    if operacao:
+        filtros.append("operacao = %s")
+        valores.append(operacao)
+    if material and material != "Todos": # Modificado para não filtrar por 'Todos'
+        filtros.append("material = %s")
+        valores.append(material)
+    if maquina:
+        filtros.append("maquina = %s")
+        valores.append(maquina)
+
+    where_clause = "WHERE " + " AND ".join(filtros) if filtros else ""
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        query = f"""
+            SELECT id, operacao, obra, qtd_ch, pecas_cortadas, hr_inicio, hr_fim,
+                   operador, maquina, data, ocorrencia, material, observacao
+            FROM registro_produtividade
+            {where_clause}
+            ORDER BY id DESC
+        """
+        cur.execute(query, tuple(valores))
+        registros = cur.fetchall()
+        
+        # Formata os dados para o DataTable
+        dados_formatados = []
+        for r in registros:
+            dados_formatados.append({
+                "id": r[0],
+                "operacao": r[1],
+                "obra": r[2],
+                "qtd_ch": r[3],
+                "pecas_cortadas": r[4],
+                "hr_inicio": r[5].strftime("%H:%M") if r[5] else "",
+                "hr_fim": r[6].strftime("%H:%M") if r[6] else "",
+                "operador": r[7],
+                "maquina": r[8],
+                "data": r[9].strftime("%d/%m/%Y") if r[9] else "",
+                "ocorrencia": r[10] or "",
+                "material": r[11] or "",
+                "observacao": r[12] or ""
+            })
+
+        cur.close()
+        conn.close()
+        
+        return jsonify({"data": dados_formatados})
+
+    except Exception as e:
+        return jsonify({"data": [], "erro": str(e)})
+
 
 
 if __name__ == '__main__':
