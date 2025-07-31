@@ -201,8 +201,8 @@
       select.innerHTML = '<option value="">Selecione</option>';
       data.forEach(item => {
         const option = document.createElement("option");
-        option.value = `${item.obra} - ${item.lote}`;
-        option.textContent = `${item.obra} - ${item.lote}`;
+        option.value = JSON.stringify({ obra: item.obra, lote: item.lote });
+        option.textContent = item.obra;
         select.appendChild(option);
       });
     });
@@ -289,7 +289,9 @@
     e.preventDefault();
 
     const operacao = operacaoSelect.value;
-    const obra = obraSelect.value;
+    const obraSelecionada = JSON.parse(obraSelect.value);
+    const obra = obraSelecionada.obra;
+    const lote = obraSelecionada.lote;
     const ocorrencia = ocorrenciaSelect.value;
     const hr_inicio = document.getElementById("hr_inicio").value;
     const hr_fim = document.getElementById("hr_fim").value;
@@ -325,7 +327,7 @@
       method: metodo,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        operacao, obra, ocorrencia, hr_inicio, hr_fim, qtd_ch,
+        operacao, obra, lote, ocorrencia, hr_inicio, hr_fim, qtd_ch,
         data, operador, material, maquina, pecas_cortadas,observacao 
       })
     })
@@ -408,7 +410,8 @@
         }
 
         document.getElementById("operacao").value = dados.operacao;
-        document.getElementById("obra").value = dados.obra;
+        const valorObraLote = JSON.stringify({ obra: dados.obra, lote: dados.lote });
+        document.getElementById("obra").value = valorObraLote;
         document.getElementById("ocorrencia").value = dados.ocorrencia || "";
         document.getElementById("hr_inicio").value = dados.hr_inicio;
         document.getElementById("hr_fim").value = dados.hr_fim;
