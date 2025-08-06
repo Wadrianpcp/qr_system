@@ -288,24 +288,32 @@
   document.getElementById("produtividadeForm").addEventListener("submit", function (e) {
     e.preventDefault();
 
-    const operacao = operacaoSelect.value;
+const operacao = operacaoSelect.value;
+let obra = "";
+let lote = "";
+
+if (operacao !== "Ocorrência") {
+    // Apenas tenta fazer o parse se a operação não for "Ocorrência"
     const obraSelecionada = JSON.parse(obraSelect.value);
-    const obra = obraSelecionada.obra;
-    const lote = obraSelecionada.lote;
-    const ocorrencia = ocorrenciaSelect.value;
-    const hr_inicio = document.getElementById("hr_inicio").value;
-    const hr_fim = document.getElementById("hr_fim").value;
-    const qtd_ch = qtdChInput.value;
-    const pecas_cortadas = pecasCortadasInput.value;
-    const data = document.getElementById("data").value;
-    const operador = document.getElementById("operador").value;
-    const material = materialSelect.value;
-    const maquina = document.getElementById("maquina").value;
-    const observacao = document.getElementById("observacao").value;
-    if (!operacao || !hr_inicio || !hr_fim || !data || !operador) {
-      alert("Preencha todos os campos obrigatórios.");
-      return;
-    }
+    obra = obraSelecionada.obra;
+    lote = obraSelecionada.lote;
+}
+
+const ocorrencia = ocorrenciaSelect.value;
+const hr_inicio = document.getElementById("hr_inicio").value;
+const hr_fim = document.getElementById("hr_fim").value;
+const qtd_ch = qtdChInput.value;
+const pecas_cortadas = pecasCortadasInput.value;
+const data = document.getElementById("data").value;
+const operador = document.getElementById("operador").value;
+const material = materialSelect.value;
+const maquina = document.getElementById("maquina").value;
+const observacao = document.getElementById("observacao").value;
+
+if (!operacao || !hr_inicio || !hr_fim || !data || !operador) {
+    alert("Preencha todos os campos obrigatórios.");
+    return;
+}
 
     if (["Assistência", "Plano", "Reposição", "Teste"].includes(operacao)) {
       if (!obra || !material || !qtd_ch) {
