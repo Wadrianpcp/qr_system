@@ -7,19 +7,14 @@ from datetime import datetime
 import pytz
 from decimal import Decimal
 import math
-
-
 from psycopg2.extensions import register_adapter, AsIs
+from werkzeug.security import generate_password_hash, check_password_hash
 
 def adapt_list(lst):
     return AsIs("ARRAY[" + ",".join(["'%s'" % item for item in lst]) + "]")
-
 register_adapter(list, adapt_list)
 
-
-
 app = Flask(__name__)
-
 DATABASE_URL = "postgresql://neondb_owner:npg_lJHgpoh53QXM@ep-old-night-acgy3449-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require"
 
 def get_db_connection():
@@ -30,11 +25,9 @@ def get_db_connection():
 def index():
     return send_file('tela_inicial.html')
 
-
 @app.route('/grafico_nes')
 def grafico_nes():
     return send_file('grafico_nes.html')
-
 
 @app.route('/embalagem')
 def tela_inicial():
@@ -47,7 +40,6 @@ def produtividade():
 @app.route('/grafico_auto')
 def grafico_auto():
     return send_file('grafico_relatorio_auto.html')
-
 
 @app.route('/grafico')
 def grafico():
@@ -85,7 +77,6 @@ def importar_lista():
 def lista_carga():
     return send_file('lista_carga.html')
 
-
 @app.route('/relatorio_perdas')
 def relatorio_perdas():
     return render_template('relatorio_perdas.html')
@@ -97,6 +88,7 @@ def relatorio():
 @app.route('/registrar_embarque')
 def registrar_embarque():
     return send_file('Embarque.html')
+
 
 @app.route('/materiais_por_maquina')
 def materiais_por_maquina():
@@ -980,12 +972,14 @@ def materiais_filtrados_por_obra():
     return jsonify(materiais)
 
 
+# CÓDIGO CORRIGIDO
 @app.route('/obras_disponiveis_produtividade')
 def obras_disponiveis_produtividade():
     data_inicio = request.args.get("data_inicio")
     data_fim = request.args.get("data_fim")
     maquina = request.args.get("maquina")
-    material = request.args.get("material")
+    # ✅ Agora pegamos a lista de materiais do request, pois pode ser múltipla
+    materiais = request.args.getlist("materiais[]")
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -1003,12 +997,14 @@ def obras_disponiveis_produtividade():
         if data_fim:
             query += " AND data <= %s"
             params.append(data_fim)
-        if maquina and maquina != "Todos":
+        # ✅ Filtra por máquina se não for 'Todas' ou vazio
+        if maquina and maquina != "Todas" and maquina != "":
             query += " AND maquina = %s"
             params.append(maquina)
-        if material and material != "Todos":
-            query += " AND material = %s"
-            params.append(material)
+        # ✅ Filtra por materiais usando o operador ANY se a lista não for vazia
+        if materiais:
+            query += " AND material = ANY(%s)"
+            params.append(materiais)
 
         query += " ORDER BY obra"
 
@@ -1044,6 +1040,9 @@ def materiais_disponiveis():
 def materiais_disponiveis_produtividade():
     data_inicio = request.args.get("data_inicio")
     data_fim = request.args.get("data_fim")
+    # ✅ Agora pegamos a lista de obras, pois pode ser múltipla
+    obras = request.args.getlist("obras[]")
+    maquina = request.args.get("maquina")
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -1058,6 +1057,14 @@ def materiais_disponiveis_produtividade():
         if data_fim:
             query += " AND data <= %s"
             valores.append(data_fim)
+        # ✅ Filtra por obras usando o operador ANY se a lista não for vazia
+        if obras:
+            query += " AND obra = ANY(%s)"
+            valores.append(obras)
+        # ✅ Filtra por máquina se não for 'Todas' ou vazio
+        if maquina and maquina != "Todas" and maquina != "":
+            query += " AND maquina = %s"
+            valores.append(maquina)
 
         query += " ORDER BY material"
 
@@ -1072,6 +1079,7 @@ def materiais_disponiveis_produtividade():
         conn.close()
 
 
+# CÓDIGO CORRIGIDO
 @app.route('/dados_relatorio_produtividade', methods=['POST'])
 def dados_relatorio_produtividade():
     dados = request.json
@@ -1084,27 +1092,32 @@ def dados_relatorio_produtividade():
 
     filtros = []
     valores = []
-
+    
+    # Lógica de filtragem corrigida para aceitar múltiplos valores de 'obra'
     if obra and "Todos" not in obra:
         filtros.append("obra = ANY(%s)")
-        valores.append(obra if isinstance(obra, list) else [obra])
+        valores.append(obra)
+
     if data_inicio:
         filtros.append("data >= %s")
         valores.append(data_inicio)
+
     if data_fim:
         filtros.append("data <= %s")
         valores.append(data_fim)
-    if operacao:
-        filtros.append("operacao = %s")
-        valores.append(operacao)
-    if material:
-        filtros.append("material = %s")
+
+    if material and "Todos" not in material and len(material) > 0:
+        filtros.append("material = ANY(%s)")
         valores.append(material)
+
     if maquina:
         filtros.append("maquina = %s")
         valores.append(maquina)
-
-    where_clause = "WHERE " + " AND ".join(filtros) if filtros else ""
+    
+    # A variável 'operacao' é tratada separadamente para as consultas de gráficos
+    where_produtividade = " AND ".join(filtros)
+    if where_produtividade:
+        where_produtividade = "WHERE " + where_produtividade
 
     query_total = f"""
         SELECT
@@ -1112,14 +1125,15 @@ def dados_relatorio_produtividade():
             COALESCE(SUM(EXTRACT(EPOCH FROM (hr_fim - hr_inicio)) / 60), 0) as minutos_totais,
             COALESCE(SUM(CAST(pecas_cortadas AS INTEGER)), 0) as qtd_pecas
         FROM registro_produtividade
-        {where_clause}
+        {where_produtividade}
     """
 
+    # Corrigir as queries de gráfico para usar a cláusula WHERE já construída
     query_paradas = f"""
         SELECT ocorrencia, SUM(EXTRACT(EPOCH FROM (hr_fim - hr_inicio)) / 60) as minutos
         FROM registro_produtividade
-        WHERE operacao = 'Ocorrência'
-        {"AND " + " AND ".join(filtros) if filtros else ""}
+        {where_produtividade}
+        {"AND" if where_produtividade else "WHERE"} operacao = 'Ocorrência'
         GROUP BY ocorrencia
         ORDER BY minutos DESC
     """
@@ -1127,16 +1141,17 @@ def dados_relatorio_produtividade():
     query_producao = f"""
         SELECT data, SUM(CAST(qtd_ch AS INTEGER)) as qtd
         FROM registro_produtividade
-        WHERE operacao IN ('Plano', 'Reposição', 'Assistência', 'Teste')
-        {"AND " + " AND ".join(filtros) if filtros else ""}
+        {where_produtividade}
+        {"AND" if where_produtividade else "WHERE"} operacao IN ('Plano', 'Reposição', 'Assistência', 'Teste')
         GROUP BY data
         ORDER BY data
     """
-
+    
     try:
         conn = get_db_connection()
         cur = conn.cursor()
 
+        # Executa as consultas
         cur.execute(query_total, tuple(valores))
         qtd_ch, minutos_totais, qtd_pecas = cur.fetchone()
         minutos_totais = minutos_totais or 0
@@ -1151,6 +1166,7 @@ def dados_relatorio_produtividade():
         cur.close()
         conn.close()
 
+        # Retorna os dados como JSON
         return jsonify({
             "qtd_ch": int(qtd_ch),
             "qtd_pecas": int(qtd_pecas),
@@ -1163,7 +1179,6 @@ def dados_relatorio_produtividade():
         })
     except Exception as e:
         return jsonify({"sucesso": False, "erro": str(e)})
-
 
 @app.route('/materiais_por_obra')
 def materiais_por_obra():
@@ -1648,6 +1663,7 @@ def dados_m2_chapa():
         material = request.args.get('material')
         data_inicio = request.args.get('dataInicio')
         data_fim = request.args.get('dataFim')
+        motivo = request.args.get('motivo') # <-- Adicione esta linha
 
         conn = get_db_connection()
         cur = conn.cursor()
@@ -1666,6 +1682,9 @@ def dados_m2_chapa():
         if data_fim:
             query += " AND data <= %s"
             params.append(data_fim)
+        if motivo and motivo != "Todos": # <-- Adicione esta condição
+            query += " AND motivo = %s"
+            params.append(motivo)
 
         cur.execute(query, params)
         resultado = cur.fetchone()
@@ -2085,6 +2104,86 @@ def dados_detalhados_perdas():
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
+@app.route('/excluir_item_carga', methods=['DELETE'])
+def excluir_item_carga():
+    cod_insumo = request.args.get('cod_insumo')
+    cargas = request.args.get('cargas')
+
+    print(f"Tentando excluir item: cod_insumo={cod_insumo}, cargas={cargas}")
+
+    if not cod_insumo or not cargas:
+        print("Erro: cod_insumo ou cargas não fornecidos.")
+        return jsonify({"sucesso": False, "erro": "cod_insumo e cargas são obrigatórios"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("DELETE FROM lista_de_carga WHERE cod_insumo = %s AND cargas = %s", (cod_insumo, cargas))
+        
+        # Obter o número de linhas afetadas
+        linhas_afetadas = cur.rowcount
+        print(f"Linhas afetadas: {linhas_afetadas}")
+
+        if linhas_afetadas == 0:
+            conn.rollback()
+            return jsonify({"sucesso": False, "erro": "Nenhum registro encontrado para exclusão."}), 404
+
+        conn.commit()
+        print("Item excluído com sucesso.")
+        
+        return jsonify({"sucesso": True})
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro ao excluir no banco de dados: {e}")
+        return jsonify({"sucesso": False, "erro": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/atualizar_item_carga', methods=['PUT'])
+def atualizar_item_carga():
+    data = request.get_json()
+    original_cod_insumo = data.get('original_cod_insumo')
+    cargas = data.get('cargas')
+    novo_cod_insumo = data.get('novo_cod_insumo')
+    novo_total = data.get('novo_total')
+
+    print(f"Recebida requisição PUT para atualizar item de carga.")
+    print(f"Dados recebidos: original_cod_insumo={original_cod_insumo}, cargas={cargas}, novo_cod_insumo={novo_cod_insumo}, novo_total={novo_total}")
+
+    if not original_cod_insumo or not cargas or novo_cod_insumo is None or novo_total is None:
+        print("Erro: dados incompletos.")
+        return jsonify({"sucesso": False, "erro": "Dados de atualização incompletos."}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # A consulta agora usa o cod_insumo original no WHERE e o novo valor no SET
+        cur.execute("UPDATE lista_de_carga SET cod_insumo = %s, total = %s WHERE cod_insumo = %s AND cargas = %s", (novo_cod_insumo, novo_total, original_cod_insumo, cargas))
+        
+        linhas_afetadas = cur.rowcount
+        print(f"Linhas atualizadas: {linhas_afetadas}")
+
+        if linhas_afetadas == 0:
+            conn.rollback()
+            return jsonify({"sucesso": False, "erro": "Nenhum registro encontrado para atualização."}), 404
+            
+        conn.commit()
+        print("Item atualizado com sucesso.")
+
+        # ATENÇÃO: Recarregue a materialized view para que a alteração apareça no relatório!
+        # cur.execute("REFRESH MATERIALIZED VIEW relatorio_atendimento_carga_embarque_mv2;")
+        # conn.commit()
+
+        return jsonify({"sucesso": True})
+    except Exception as e:
+        conn.rollback()
+        print(f"Erro ao atualizar no banco de dados: {e}")
+        return jsonify({"sucesso": False, "erro": str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
 
 @app.route('/dados_tabela_produtividade', methods=['POST'])
 def dados_tabela_produtividade():
@@ -2099,7 +2198,6 @@ def dados_tabela_produtividade():
     filtros = []
     valores = []
 
-    # Construção dinâmica dos filtros (igual à rota do relatório)
     if obra and "Todos" not in obra:
         filtros.append("obra = ANY(%s)")
         valores.append(obra if isinstance(obra, list) else [obra])
@@ -2112,9 +2210,9 @@ def dados_tabela_produtividade():
     if operacao:
         filtros.append("operacao = %s")
         valores.append(operacao)
-    if material and material != "Todos": # Modificado para não filtrar por 'Todos'
-        filtros.append("material = %s")
-        valores.append(material)
+    if material and "Todos" not in material and len(material) > 0:
+       filtros.append("material = ANY(%s)")
+       valores.append(material)
     if maquina:
         filtros.append("maquina = %s")
         valores.append(maquina)
@@ -2135,7 +2233,6 @@ def dados_tabela_produtividade():
         cur.execute(query, tuple(valores))
         registros = cur.fetchall()
         
-        # Formata os dados para o DataTable
         dados_formatados = []
         for r in registros:
             dados_formatados.append({
