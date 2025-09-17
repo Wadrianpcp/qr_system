@@ -5,16 +5,22 @@
   <title>Lançamento de Produtividade</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  
   <style>
+    /* Estilos Gerais */
     body {
       font-family: Arial, sans-serif;
       background-color: #f4f4f4;
       padding: 30px;
       color: #333;
     }
+
     h2 {
       text-align: center;
     }
+
+    /* Estilos do Formulário */
     form {
       max-width: 900px;
       margin: auto;
@@ -23,32 +29,39 @@
       border-radius: 10px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
+    
     .form-row {
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       margin-bottom: 15px;
     }
+    
     .form-group {
       flex: 1 1 30%;
       min-width: 200px;
       padding: 5px;
     }
+    
     label {
       display: block;
       margin-bottom: 5px;
       font-weight: bold;
     }
+    
     input, select {
       width: 100%;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 5px;
     }
+
+    /* Estilos dos Botões */
     .buttons {
       text-align: center;
       margin-top: 20px;
     }
+    
     button {
       padding: 10px 20px;
       margin: 0 10px;
@@ -58,418 +71,574 @@
       border-radius: 5px;
       cursor: pointer;
     }
+    
     button:hover {
       background-color: #125ca1;
     }
+
+    /* Estilos da Tabela */
     table {
       width: 100%;
       margin-top: 40px;
       background: white;
       border-collapse: collapse;
     }
+    
     th, td {
       padding: 8px;
       border: 1px solid #ccc;
       text-align: center;
     }
+
+    /* Estilos do Modal de Observação */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 400px;
+      text-align: center;
+    }
+    
+    #obsTexto {
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
 
-<h2>Lançamento de Produtividade</h2>
+  <h2>Lançamento de Produtividade</h2>
 
-<form id="produtividadeForm">
-  <div class="form-row">
-    <div class="form-group">
-      <label for="operacao">Operação</label>
-      <select id="operacao" required>
-        <option value="">Selecione</option>
-        <option value="Assistência">Assistência</option>
-        <option value="Ocorrência">Ocorrência</option>
-        <option value="Plano">Plano</option>
-        <option value="Reposição">Reposição</option>
-        <option value="Teste">Teste</option>
-      </select>
+  <form id="produtividadeForm">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="operacao">Operação</label>
+        <select id="operacao" required>
+          <option value="">Selecione</option>
+          <option value="Assistência">Assistência</option>
+          <option value="Ocorrência">Ocorrência</option>
+          <option value="Plano">Plano</option>
+          <option value="Reposição">Reposição</option>
+          <option value="Teste">Teste</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="obra">Obra</label>
+        <select id="obra" required></select>
+      </div>
+      <div class="form-group">
+        <label for="ocorrencia">Ocorrência</label>
+        <select id="ocorrencia" required></select>
+      </div>
+      <div class="form-group">
+        <label for="observacao">Obs:</label>
+        <input type="text" id="observacao" placeholder="Escreva aqui...">
+      </div>
     </div>
-    <div class="form-group">
-      <label for="obra">Obra</label>
-      <select id="obra" required></select>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="hr_inicio">Hr Inicial</label>
+        <input type="time" id="hr_inicio" required>
+      </div>
+      <div class="form-group">
+        <label for="hr_fim">Hr Final</label>
+        <input type="time" id="hr_fim" required>
+      </div>
+      <div class="form-group">
+        <label for="qtd_ch">Qtd Ch</label>
+        <input type="number" id="qtd_ch" required>
+      </div>
+      <div class="form-group">
+        <label for="pecas_cortadas">Qtd Peças</label>
+        <input type="number" id="pecas_cortadas" min="0">
+      </div>
+      <div class="form-group">
+        <label for="maquina">Máquina</label>
+        <select id="maquina" required>
+          <option value="">Selecione</option>
+          <option value="Nes01">Nes01</option>
+          <option value="Nes02">Nes02</option>
+          <option value="Sec01">Sec01</option>
+        </select>
+      </div>
     </div>
-    <div class="form-group">
-      <label for="ocorrencia">Ocorrência</label>
-      <select id="ocorrencia" required></select>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="data">Data</label>
+        <input type="date" id="data" required>
+      </div>
+      <div class="form-group">
+        <label for="operador">Operador</label>
+        <select id="operador" required></select>
+      </div>
+      <div class="form-group">
+        <label for="material">Material</label>
+        <select id="material" required></select>
+      </div>
     </div>
-  <div class="form-group">
-    <label for="observacao">Obs:</label>
-    <input type="text" id="observacao" placeholder="Escreva aqui...">
+
+    <div class="buttons">
+      <button type="submit">Salvar</button>
+      <button type="reset">Limpar formulário</button>
+    </div>
+  </form>
+
+  <h3 style="text-align: center;">Registros de Lançamento</h3>
+  <table id="tabelaRegistros" class="display">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Operação</th>
+        <th>Obra</th>
+        <th>Qtd Ch</th>
+        <th>Qtd Peças</th>
+        <th>Hr Início</th>
+        <th>Hr Final</th>
+        <th>Operador</th>
+        <th>Máquina</th>
+        <th>Data</th>
+        <th>Ocorrência</th>
+        <th>Material</th>
+        <th>Ação</th>
+      </tr>
+    </thead>
+  </table>
+
+  <div id="modalObs" class="modal">
+    <div class="modal-content">
+      <h3>Observação</h3>
+      <p id="obsTexto"></p>
+      <button onclick="fecharObs()">Fechar</button>
+    </div>
   </div>
 
-</div>
-
-
-  <div class="form-row">
-    <div class="form-group">
-      <label for="hr_inicio">Hr Inicial</label>
-      <input type="time" id="hr_inicio" required>
-    </div>
-    <div class="form-group">
-      <label for="hr_fim">Hr Final</label>
-      <input type="time" id="hr_fim" required>
-    </div>
-    <div class="form-group">
-      <label for="qtd_ch">Qtd Ch</label>
-      <input type="number" id="qtd_ch" required>
-    </div>
-<div class="form-group">
-  <label for="pecas_cortadas">Qtd Peças</label>
-  <input type="number" id="pecas_cortadas" min="0">
-</div>
-
-    <div class="form-group">
-      <label for="maquina">Máquina</label>
-      <select id="maquina" required>
-        <option value="">Selecione</option>
-        <option value="Nes01">Nes01</option>
-        <option value="Nes02">Nes02</option>
-        <option value="Sec01">Sec01</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="form-row">
-    <div class="form-group">
-      <label for="data">Data</label>
-      <input type="date" id="data" required>
-    </div>
-    <div class="form-group">
-      <label for="operador">Operador</label>
-      <select id="operador" required></select>
-    </div>
-    <div class="form-group">
-      <label for="material">Material</label>
-      <select id="material" required></select>
-    </div>
-  </div>
-
-  <div class="buttons">
-    <button type="submit">Salvar</button>
-    <button type="reset">Limpar formulário</button>
-  </div>
-</form>
-
-<h3 style="text-align: center;">Registros de Lançamento</h3>
-<table id="tabelaRegistros" class="display">
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>Operação</th>
-      <th>Obra</th>
-      <th>Qtd Ch</th>
-      <th>Qtd Peças</th>
-      <th>Hr Início</th>
-      <th>Hr Final</th>
-      <th>Operador</th>
-      <th>Máquina</th>
-      <th>Data</th>
-      <th>Ocorrência</th>
-      <th>Material</th> <!-- nova coluna -->
-      <th>Ação</th> <!-- nova coluna -->
-    </tr>
-  </thead>
-</table>
-
-<!-- 🔽 Cole aqui o modal -->
-<div id="modalObs" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; z-index:1000;">
-  <div style="background:white; padding:20px; border-radius:8px; max-width:400px; text-align:center;">
-    <h3>Observação</h3>
-    <p id="obsTexto" style="white-space:pre-wrap;"></p>
-    <button onclick="fecharObs()" style="margin-top:15px;">Fechar</button>
-  </div>
-</div>
-
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script>
-  let operadorAnterior = "";
-
-  function carregarSelects(preservarMaquina = true, preservarOperador = true) {
-    const maquinaAtual = document.getElementById("maquina").value;
-
-    fetch('/obras_lotes').then(res => res.json()).then(data => {
-      const select = document.getElementById("obra");
-      select.innerHTML = '<option value="">Selecione</option>';
-      data.forEach(item => {
-        const option = document.createElement("option");
-        option.value = JSON.stringify({ obra: item.obra, lote: item.lote });
-        option.textContent = item.obra;
-        select.appendChild(option);
-      });
-    });
-
-    fetch('/ocorrencia').then(res => res.json()).then(data => {
-      const select = document.getElementById("ocorrencia");
-      select.innerHTML = '<option value="">Selecione</option>';
-      data.forEach(item => {
-        const option = document.createElement("option");
-        option.value = item.ocorrencia;
-        option.textContent = item.ocorrencia;
-        select.appendChild(option);
-      });
-    });
-
-    fetch('/operadores').then(res => res.json()).then(data => {
-      const select = document.getElementById("operador");
-      const valorSelecionado = preservarOperador ? operadorAnterior : "";
-      select.innerHTML = '<option value="">Selecione</option>';
-      data.forEach(item => {
-        const option = document.createElement("option");
-        option.value = item.operadores;
-        option.textContent = item.operadores;
-        if (item.operadores === valorSelecionado) {
-          option.selected = true;
-        }
-        select.appendChild(option);
-      });
-    });
-
-    fetch('/material').then(res => res.json()).then(data => {
-      const select = document.getElementById("material");
-      select.innerHTML = '<option value="">Selecione</option>';
-      data.forEach(item => {
-        const option = document.createElement("option");
-        option.value = item.material;
-        option.textContent = item.material;
-        select.appendChild(option);
-      });
-    });
-
-    if (preservarMaquina) {
-      document.getElementById("maquina").value = maquinaAtual;
-    }
-  }
-
-  const operacaoSelect = document.getElementById('operacao');
-  const ocorrenciaSelect = document.getElementById('ocorrencia');
-  const obraSelect = document.getElementById('obra');
-  const materialSelect = document.getElementById('material');
-  const qtdChInput = document.getElementById('qtd_ch');
-  const pecasCortadasInput = document.getElementById('pecas_cortadas');
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   
+  <script>
+    // Variável global para manter o estado anterior do operador
+    let operadorAnterior = "";
 
+    // Mapeamento de elementos do formulário para facilitar o acesso
+    const operacaoSelect = document.getElementById('operacao');
+    const ocorrenciaSelect = document.getElementById('ocorrencia');
+    const obraSelect = document.getElementById('obra');
+    const materialSelect = document.getElementById('material');
+    const qtdChInput = document.getElementById('qtd_ch');
+    const pecasCortadasInput = document.getElementById('pecas_cortadas');
+    const observacaoInput = document.getElementById("observacao");
+    const hrInicioInput = document.getElementById("hr_inicio");
+    const hrFimInput = document.getElementById("hr_fim");
+    const dataInput = document.getElementById("data");
+    const operadorSelect = document.getElementById("operador");
+    const maquinaSelect = document.getElementById("maquina");
+    const form = document.getElementById("produtividadeForm");
+    
+    // =========================================================
+    // Funções de Carregamento de Dados
+    // =========================================================
 
-  function atualizarRegras() {
-    const operacao = operacaoSelect.value;
-    const isAssistenciaOuPlano = ["Assistência", "Plano", "Reposição", "Teste"].includes(operacao);
-    const isOcorrencia = operacao === "Ocorrência";
-
-    ocorrenciaSelect.disabled = isAssistenciaOuPlano;
-    if (isAssistenciaOuPlano) ocorrenciaSelect.value = "";
-
-    obraSelect.disabled = isOcorrencia;
-    materialSelect.disabled = isOcorrencia;
-    qtdChInput.disabled = isOcorrencia;
-    pecasCortadasInput.disabled = isOcorrencia;
-
-    if (isOcorrencia) {
-      obraSelect.value = "";
-      materialSelect.value = "";
-      qtdChInput.value = "";
-      pecasCortadasInput.value = "";
-    }
-  }
-
-  operacaoSelect.addEventListener('change', atualizarRegras);
-  window.addEventListener('DOMContentLoaded', () => {
-    carregarSelects(false, false);
-    atualizarRegras();
-  });
-
-  document.getElementById("produtividadeForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-
-const operacao = operacaoSelect.value;
-let obra = "";
-let lote = "";
-
-if (operacao !== "Ocorrência") {
-    // Apenas tenta fazer o parse se a operação não for "Ocorrência"
-    const obraSelecionada = JSON.parse(obraSelect.value);
-    obra = obraSelecionada.obra;
-    lote = obraSelecionada.lote;
-}
-
-const ocorrencia = ocorrenciaSelect.value;
-const hr_inicio = document.getElementById("hr_inicio").value;
-const hr_fim = document.getElementById("hr_fim").value;
-const qtd_ch = qtdChInput.value;
-const pecas_cortadas = pecasCortadasInput.value;
-const data = document.getElementById("data").value;
-const operador = document.getElementById("operador").value;
-const material = materialSelect.value;
-const maquina = document.getElementById("maquina").value;
-const observacao = document.getElementById("observacao").value;
-
-if (!operacao || !hr_inicio || !hr_fim || !data || !operador) {
-    alert("Preencha todos os campos obrigatórios.");
-    return;
-}
-
-    if (["Assistência", "Plano", "Reposição", "Teste"].includes(operacao)) {
-      if (!obra || !material || !qtd_ch) {
-        alert("Preencha Obra, Material e Qtd Ch.");
-        return;
+    /**
+     * Carrega os dados dos selects (Ocorrência, Operador) a partir do servidor.
+     * As opções de Obra e Material serão carregadas via AJAX pelo Select2.
+     * @param {boolean} preservarMaquina - Mantém o valor selecionado da máquina.
+     * @param {boolean} preservarOperador - Mantém o valor selecionado do operador.
+     */
+    function carregarSelects(preservarMaquina = true, preservarOperador = true) {
+      const maquinaAtual = maquinaSelect.value;
+    
+      // Carrega Operadores
+      fetch('/operadores')
+        .then(res => res.json())
+        .then(data => {
+          const select = operadorSelect;
+          const valorSelecionado = preservarOperador ? operadorAnterior : "";
+          select.innerHTML = '<option value="">Selecione</option>';
+          data.forEach(item => {
+            const option = document.createElement("option");
+            option.value = item.operadores;
+            option.textContent = item.operadores;
+            if (item.operadores === valorSelecionado) {
+              option.selected = true;
+            }
+            select.appendChild(option);
+          });
+        });
+    
+      if (preservarMaquina) {
+        maquinaSelect.value = maquinaAtual;
       }
-    } else if (operacao === "Ocorrência" && !ocorrencia) {
-      alert("Selecione uma Ocorrência.");
-      return;
     }
+    
+    // =========================================================
+    // Funções de Lógica do Formulário
+    // =========================================================
 
-    operadorAnterior = operador;
+    /**
+     * Atualiza as regras de habilitação/desabilitação dos campos do formulário
+     * com base na operação selecionada.
+     */
+    function atualizarRegras() {
+      const operacao = operacaoSelect.value;
+      const isOcorrencia = operacao === "Ocorrência";
+      
+      // Lógica CORRIGIDA: Habilita/desabilita a ocorrência
+      ocorrenciaSelect.disabled = !isOcorrencia;
+      if (!isOcorrencia) $(ocorrenciaSelect).val(null).trigger('change');
 
-    const idEdicao = document.getElementById("produtividadeForm").getAttribute("data-edicao-id");
-    const url = idEdicao ? `/atualizar_produtividade/${idEdicao}` : '/registrar_produtividade';
-    const metodo = idEdicao ? "PUT" : "POST";
+      // Lógica CORRIGIDA: Habilita/desabilita os outros campos
+      obraSelect.disabled = isOcorrencia;
+      materialSelect.disabled = isOcorrencia;
+      qtdChInput.disabled = isOcorrencia;
+      pecasCortadasInput.disabled = isOcorrencia;
 
-    fetch(url, {
-      method: metodo,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        operacao, obra, lote, ocorrencia, hr_inicio, hr_fim, qtd_ch,
-        data, operador, material, maquina, pecas_cortadas,observacao 
-      })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.sucesso) {
-        alert("Produtividade registrada com sucesso!");
-        operacaoSelect.value = "";
-        obraSelect.value = "";
-        ocorrenciaSelect.value = "";
+      if (isOcorrencia) {
+        // Limpa os selects Select2 de Obra e Material
+        $(obraSelect).val(null).trigger('change');
+        $(materialSelect).val(null).trigger('change');
         qtdChInput.value = "";
         pecasCortadasInput.value = "";
-        materialSelect.value = "";
-        document.getElementById("observacao").value = "";
-        document.getElementById("hr_inicio").value = hr_fim;
-        document.getElementById("hr_fim").value = "";
-        atualizarRegras();
-        $('#tabelaRegistros').DataTable().ajax.reload();
-        carregarSelects(true, true);
-        document.getElementById("produtividadeForm").removeAttribute("data-edicao-id");
-      } else {
-        alert("Erro ao registrar: " + (data.erro || "Erro desconhecido"));
       }
-    })
-    .catch(err => {
-      alert("Erro na comunicação com o servidor.");
-      console.error(err);
-    });
-  });
+    }
 
-  $(document).ready(function () {
-    const tabela = $('#tabelaRegistros').DataTable({
-      ajax: {
-        url: "/listar_registros_produtividade",
-        data: function (d) {
-          d.maquina = document.getElementById("maquina").value;
-        },
-        dataSrc: "data"
-      },
-      columns: [
-        { data: "id" },
-        { data: "operacao" },
-        { data: "obra" },
-        { data: "qtd_ch" },
-        { data: "pecas_cortadas" },
-        { data: "hr_inicio" },
-        { data: "hr_fim" },
-        { data: "operador" },
-        { data: "maquina" },
-        { data: "data" },
-        { data: "ocorrencia" },
-        { data: "material" },
-        {
-          data: null,
-          render: function (data, type, row) {
-            return `
-              <button onclick="editarRegistro(${row.id})">Editar</button>
-              <button onclick="excluirRegistro(${row.id})" style="margin-left:5px; background-color:#d32f2f; color:white;">Excluir</button>
-              <button onclick="verObs('${row.observacao || ''}')" title="Ver Observação" style="margin-left:5px; background-color:#444; color:white;">👁️</button>
+    /**
+     * Limpa o formulário e prepara para o próximo lançamento,
+     * reutilizando a hora final como hora inicial.
+     */
+    function resetarFormulario() {
+      const hrFimAnterior = hrFimInput.value;
+      form.reset();
+      hrInicioInput.value = hrFimAnterior;
+      hrFimInput.value = "";
+      atualizarRegras();
+      form.removeAttribute("data-edicao-id");
+      // Limpa os selects Select2
+      $(obraSelect).val(null).trigger('change');
+      $(materialSelect).val(null).trigger('change');
+      $(ocorrenciaSelect).val(null).trigger('change');
+    }
 
-            `;
-          }
+    // =========================================================
+    // Funções de CRUD (Create, Read, Update, Delete)
+    // =========================================================
+
+    /**
+     * Envia os dados do formulário para o servidor para registro ou atualização.
+     * @param {Event} e - O evento de envio do formulário.
+     */
+    function submitHandler(e) {
+      e.preventDefault();
+
+      const operacao = operacaoSelect.value;
+      let obra = "";
+      
+      if (operacao !== "Ocorrência") {
+        obra = obraSelect.value;
+        if (!obra) {
+           alert("Selecione uma Obra válida.");
+           return;
         }
-      ],
-      order: [[0, "desc"]]
-    });
+      }
 
-    document.getElementById("maquina").addEventListener("change", function () {
-      tabela.ajax.reload();
-    });
-  });
+      const dadosForm = {
+        operacao,
+        obra,
+        ocorrencia: ocorrenciaSelect.value,
+        hr_inicio: hrInicioInput.value,
+        hr_fim: hrFimInput.value,
+        qtd_ch: qtdChInput.value,
+        pecas_cortadas: pecasCortadasInput.value,
+        data: dataInput.value,
+        operador: operadorSelect.value,
+        material: materialSelect.value,
+        maquina: maquinaSelect.value,
+        observacao: observacaoInput.value
+      };
 
-  function editarRegistro(id) {
-    fetch(`/obter_registro/${id}`)
-      .then(res => res.json())
-      .then(dados => {
-        if (dados.erro) {
-          alert("Registro não encontrado.");
+      // Validação adicional de campos obrigatórios
+      if (!dadosForm.operacao || !dadosForm.hr_inicio || !dadosForm.hr_fim || !dadosForm.data || !dadosForm.operador) {
+        alert("Preencha todos os campos obrigatórios.");
+        return;
+      }
+
+      if (["Assistência", "Plano", "Reposição", "Teste"].includes(operacao)) {
+        if (!dadosForm.obra || !dadosForm.material || !dadosForm.qtd_ch) {
+          alert("Preencha Obra, Material e Qtd Ch.");
           return;
         }
-
-        document.getElementById("operacao").value = dados.operacao;
-        const valorObraLote = JSON.stringify({ obra: dados.obra, lote: dados.lote });
-        document.getElementById("obra").value = valorObraLote;
-        document.getElementById("ocorrencia").value = dados.ocorrencia || "";
-        document.getElementById("hr_inicio").value = dados.hr_inicio;
-        document.getElementById("hr_fim").value = dados.hr_fim;
-        document.getElementById("qtd_ch").value = dados.qtd_ch;
-        document.getElementById("pecas_cortadas").value = dados.pecas_cortadas || 0;
-        document.getElementById("data").value = dados.data;
-        document.getElementById("operador").value = dados.operador;
-        document.getElementById("material").value = dados.material;
-        document.getElementById("maquina").value = dados.maquina;
-        document.getElementById("observacao").value = dados.observacao || "";
-
-        document.getElementById("produtividadeForm").setAttribute("data-edicao-id", id);
-        atualizarRegras();
-      });
-  }
-
-  function excluirRegistro(id) {
-    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
-
-    fetch(`/excluir_registro/${id}`, {
-      method: "DELETE"
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.sucesso) {
-        alert("Registro excluído com sucesso!");
-        $('#tabelaRegistros').DataTable().ajax.reload();
-      } else {
-        alert("Erro ao excluir registro: " + (data.erro || "Erro desconhecido"));
+      } else if (operacao === "Ocorrência" && !dadosForm.ocorrencia) {
+        alert("Selecione uma Ocorrência.");
+        return;
       }
-    })
-    .catch(err => {
-      alert("Erro na comunicação com o servidor.");
-      console.error(err);
+
+      operadorAnterior = dadosForm.operador;
+      const idEdicao = form.getAttribute("data-edicao-id");
+      const url = idEdicao ? `/atualizar_produtividade/${idEdicao}` : '/registrar_produtividade';
+      const metodo = idEdicao ? "PUT" : "POST";
+
+      fetch(url, {
+        method: metodo,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dadosForm)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.sucesso) {
+          alert("Produtividade registrada com sucesso!");
+          resetarFormulario();
+          $('#tabelaRegistros').DataTable().ajax.reload();
+          carregarSelects(true, true);
+        } else {
+          alert("Erro ao registrar: " + (data.erro || "Erro desconhecido"));
+        }
+      })
+      .catch(err => {
+        alert("Erro na comunicação com o servidor.");
+        console.error(err);
+      });
+    }
+
+    /**
+     * Carrega os dados de um registro específico no formulário para edição.
+     * @param {number} id - O ID do registro a ser editado.
+     */
+    function editarRegistro(id) {
+      fetch(`/obter_registro/${id}`)
+        .then(res => res.json())
+        .then(dados => {
+          if (dados.erro) {
+            alert("Registro não encontrado.");
+            return;
+          }
+          
+          operacaoSelect.value = dados.operacao;
+          ocorrenciaSelect.value = dados.ocorrencia || "";
+          hrInicioInput.value = dados.hr_inicio;
+          hrFimInput.value = dados.hr_fim;
+          qtdChInput.value = dados.qtd_ch;
+          pecasCortadasInput.value = dados.pecas_cortadas || 0;
+          dataInput.value = dados.data;
+          operadorSelect.value = dados.operador;
+          maquinaSelect.value = dados.maquina;
+          observacaoInput.value = dados.observacao || "";
+          
+          // Configura os selects2 com os valores carregados
+          if (dados.obra) {
+            const newOption = new Option(dados.obra, dados.obra, true, true);
+            $(obraSelect).append(newOption).trigger('change');
+          }
+          
+          if (dados.material) {
+            const newOption = new Option(dados.material, dados.material, true, true);
+            $(materialSelect).append(newOption).trigger('change');
+          }
+
+          if (dados.ocorrencia) {
+            const newOption = new Option(dados.ocorrencia, dados.ocorrencia, true, true);
+            $(ocorrenciaSelect).append(newOption).trigger('change');
+          }
+
+          form.setAttribute("data-edicao-id", id);
+          atualizarRegras();
+        });
+    }
+
+    /**
+     * Exclui um registro da tabela.
+     * @param {number} id - O ID do registro a ser excluído.
+     */
+    function excluirRegistro(id) {
+      if (!confirm("Tem certeza que deseja excluir este registro?")) return;
+
+      fetch(`/excluir_registro/${id}`, { method: "DELETE" })
+        .then(res => res.json())
+        .then(data => {
+          if (data.sucesso) {
+            alert("Registro excluído com sucesso!");
+            $('#tabelaRegistros').DataTable().ajax.reload();
+          } else {
+            alert("Erro ao excluir registro: " + (data.erro || "Erro desconhecido"));
+          }
+        })
+        .catch(err => {
+          alert("Erro na comunicação com o servidor.");
+          console.error(err);
+        });
+    }
+
+    // =========================================================
+    // Funções do Modal de Observação
+    // =========================================================
+
+    /**
+     * Exibe o modal com a observação completa.
+     * @param {string} obs - A observação a ser exibida.
+     */
+    function verObs(obs) {
+      document.getElementById("obsTexto").textContent = obs || "(Sem observação)";
+      document.getElementById("modalObs").style.display = "flex";
+    }
+
+    /**
+     * Fecha o modal de observação.
+     */
+    function fecharObs() {
+      document.getElementById("modalObs").style.display = "none";
+    }
+    
+    // =========================================================
+    // Inicialização e Event Listeners
+    // =========================================================
+
+    // Executado quando o DOM estiver completamente carregado
+    document.addEventListener('DOMContentLoaded', () => {
+      carregarSelects(false, false);
+      atualizarRegras();
+      form.addEventListener("submit", submitHandler);
+      operacaoSelect.addEventListener('change', atualizarRegras);
     });
-  }
-function verObs(obs) {
-  document.getElementById("obsTexto").textContent = obs || "(Sem observação)";
-  document.getElementById("modalObs").style.display = "flex";
-}
 
-function fecharObs() {
-  document.getElementById("modalObs").style.display = "none";
-}
+    // Executado quando o jQuery estiver pronto
+    $(document).ready(function () {
+        // Inicialização da Tabela de Registros
+        const tabela = $('#tabelaRegistros').DataTable({
+          ajax: {
+            url: "/listar_registros_produtividade",
+            data: function (d) {
+              d.maquina = maquinaSelect.value;
+            },
+            dataSrc: "data"
+          },
+          columns: [
+            { data: "id" },
+            { data: "operacao" },
+            { data: "obra" },
+            { data: "qtd_ch" },
+            { data: "pecas_cortadas" },
+            { data: "hr_inicio" },
+            { data: "hr_fim" },
+            { data: "operador" },
+            { data: "maquina" },
+            { data: "data" },
+            { data: "ocorrencia" },
+            { data: "material" },
+            {
+              data: null,
+              render: function (data, type, row) {
+                const obsBtn = row.observacao ? `<button onclick="verObs('${row.observacao.replace(/'/g, "\\'")}')" title="Ver Observação" style="margin-left:5px; background-color:#444; color:white;">👁️</button>` : '';
+                return `
+                  <button onclick="editarRegistro(${row.id})">Editar</button>
+                  <button onclick="excluirRegistro(${row.id})" style="margin-left:5px; background-color:#d32f2f; color:white;">Excluir</button>
+                  ${obsBtn}
+                `;
+              }
+            }
+          ],
+          order: [[0, "desc"]]
+        });
 
+      // Configuração Select2 com AJAX para Obra
+      $('#obra').select2({
+        placeholder: "Digite para buscar a obra",
+        allowClear: true,
+        ajax: {
+          url: "/obras_com_busca",
+          dataType: 'json',
+          delay: 250,
+          data: function(params) {
+            return {
+              search: params.term
+            };
+          },
+          processResults: function(data) {
+            return {
+              results: data.results.map(item => ({
+                id: item.id, // O ID deve ser o valor que você quer enviar para o servidor
+                text: item.text // O texto que será exibido
+              }))
+            };
+          },
+          cache: true
+        }
+      });
+    
+      // Configuração Select2 com AJAX para Material
+      $('#material').select2({
+        placeholder: "Digite para buscar o material",
+        allowClear: true,
+        ajax: {
+          url: "/materiais_com_busca",
+          dataType: 'json',
+          delay: 250,
+          data: function(params) {
+            return {
+              search: params.term
+            };
+          },
+          processResults: function(data) {
+            return {
+              results: data.results.map(item => ({
+                id: item.id,
+                text: item.text
+              }))
+            };
+          },
+          cache: true
+        }
+      });
+      
+      // NOVO: Configuração Select2 com AJAX para Ocorrência
+      $('#ocorrencia').select2({
+        placeholder: "Digite para buscar a ocorrência",
+        allowClear: true,
+        ajax: {
+          url: "/ocorrencia_com_busca", // Você precisará criar este endpoint no seu backend
+          dataType: 'json',
+          delay: 250,
+          data: function(params) {
+            return {
+              search: params.term
+            };
+          },
+          processResults: function(data) {
+            return {
+              results: data.results.map(item => ({
+                id: item.id,
+                text: item.text
+              }))
+            };
+          },
+          cache: true
+        }
+      });
 
-</script>
+      maquinaSelect.addEventListener("change", function () {
+        tabela.ajax.reload();
+      });
+    });
 
+    // Funções globais necessárias para os botões do DataTables
+    window.editarRegistro = editarRegistro;
+    window.excluirRegistro = excluirRegistro;
+    window.verObs = verObs;
+    window.fecharObs = fecharObs;
 
+  </script>
 
 </body>
 </html>
-
